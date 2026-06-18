@@ -83,14 +83,34 @@ Verified:
 - `npm run typecheck`
 - `npm --workspace apps/web run build`
 
+### 2026-06-18 - Day 4 Docker Compose setup hardening
+
+Implemented:
+
+- Added `.dockerignore` files for root, API, and service build contexts.
+- Added API and web health checks to `docker-compose.yml`.
+- Made web depend on API service health.
+- Added `docs/docker.md` with Compose usage, health checks, verification commands, and Docker credential troubleshooting.
+- Updated README and task docs.
+
+Verified:
+
+- `docker compose config --quiet`
+- `docker pull python:3.12-slim`
+- PostgreSQL and Redis containers started during `docker compose run --build --rm api pytest`
+
+Pending verification:
+
+- Full `docker compose up --build`.
+- Backend pytest through Docker.
+- The latest Compose pytest attempt stalled during Python dependency installation in the API image before pytest started.
+
 ## Next task candidate
 
-### Day 4 - Docker Compose setup verification and hardening
+### Day 5 - Developer commands polish
 
 Suggested scope:
 
-- Resolve Docker credential issue for image pulls.
-- Run `docker compose up --build`.
-- Verify frontend, backend, PostgreSQL, and Redis are accessible.
-- Run backend pytest inside Docker.
-- Update README with any Docker troubleshooting notes.
+- Add Makefile aliases expected by the plan, such as `make up`, `make api-test`, and `make web-test`.
+- Ensure README command list matches Makefile.
+- Keep Docker and local npm workflows separate and clear.

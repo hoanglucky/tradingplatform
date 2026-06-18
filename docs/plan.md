@@ -309,11 +309,23 @@ Update README with local setup instructions.
 
 **Done checklist:**
 
+* [x] Docker Compose config validates
+* [x] API Dockerfile exists
+* [x] Web Dockerfile exists
+* [x] PostgreSQL healthcheck exists
+* [x] Redis healthcheck exists
+* [x] API healthcheck exists
+* [x] Web healthcheck exists
+* [x] Docker build contexts ignore generated/local files
 * [ ] `docker compose up` works
 * [ ] Frontend accessible
 * [ ] Backend accessible
-* [ ] PostgreSQL starts
-* [ ] Redis starts
+* [x] PostgreSQL starts during Compose test attempt
+* [x] Redis starts during Compose test attempt
+
+**Implementation note - 2026-06-18:**
+
+Docker Compose has been hardened with API/web health checks and `.dockerignore` files for root, API, and service build contexts. `docker compose config --quiet` validates. `docker pull python:3.12-slim` now works, and PostgreSQL/Redis started during the Compose test attempt. Full `docker compose up --build` and backend pytest through Docker remain pending because the API image build stalled during Python dependency installation before pytest started.
 
 ---
 

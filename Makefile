@@ -5,7 +5,8 @@ SHELL := /bin/bash
 help:
 	@printf "Available commands:\n"
 	@printf "  make setup   Create .env and install frontend dependencies\n"
-	@printf "  make dev     Start the full local stack with Docker Compose\n"
+	@printf "  make dev     Start API and web locally through npm\n"
+	@printf "  make compose Start the full local stack with Docker Compose\n"
 	@printf "  make down    Stop the local stack\n"
 	@printf "  make logs    Tail Docker Compose logs\n"
 	@printf "  make ps      Show service status\n"
@@ -20,6 +21,9 @@ setup:
 	npm install
 
 dev:
+	npm run dev
+
+compose:
 	docker compose up --build
 
 down:
@@ -50,4 +54,3 @@ format:
 clean:
 	docker compose down -v
 	rm -rf node_modules apps/web/node_modules apps/web/.next
-

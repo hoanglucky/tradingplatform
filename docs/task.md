@@ -29,16 +29,17 @@
 
 ## Current review task
 
-Review the Day 3 Next.js frontend skeleton hardening.
+Review the Day 4 Docker Compose setup hardening.
 
 Focus areas:
 
-- Confirm sidebar navigation covers the planned MVP sections.
-- Confirm topbar and system strip show API health/readiness and safety state.
-- Confirm the main dashboard has empty states for chart, watchlist, and signals.
-- Confirm placeholder routes render for markets, strategies, backtests, paper trading, alerts, and settings.
-- Confirm no live trading controls were added.
-- Confirm exchange writes remain visibly blocked.
+- Confirm Docker Compose config validates with `.env.example`.
+- Confirm API and web Dockerfiles exist.
+- Confirm PostgreSQL, Redis, API, and web healthchecks are present.
+- Confirm web waits for API health before starting.
+- Confirm `.dockerignore` files exclude generated files, local env files, and dependency folders.
+- Confirm Docker credential issue is documented and not mistaken for an app test failure.
+- Confirm no live trading or exchange write behavior was added.
 
 ## Verification commands
 
@@ -59,5 +60,6 @@ docker compose run --rm api pytest
 
 Current blocker:
 
-- Docker BuildKit failed resolving `python:3.12-slim` with `error getting credentials`.
+- Docker can now pull `python:3.12-slim`.
+- The latest Compose pytest attempt stalled during API image Python dependency installation before pytest started.
 - Host Python does not have `pip`/`venv`, so pytest cannot run directly on the host yet.

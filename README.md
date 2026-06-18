@@ -37,17 +37,24 @@ make dev
 
 The local stack exposes:
 
-- Web app: <http://localhost:3000>
+- Web app: <http://localhost:2000>
 - API: <http://localhost:8000>
 - API docs: <http://localhost:8000/docs>
 - PostgreSQL: `localhost:5432`
 - Redis: `localhost:6379`
 
+`make dev` runs the API and web app locally through `npm run dev`. For the full Docker Compose stack, use:
+
+```bash
+make compose
+```
+
 ## Development Commands
 
 ```bash
 make setup   # create .env and install frontend dependencies
-make dev     # start all services with Docker Compose
+make dev     # start FastAPI and Next.js locally through npm
+make compose # start all services with Docker Compose
 make down    # stop containers
 make logs    # tail logs
 make web     # run Next.js outside Compose
@@ -56,6 +63,23 @@ make test    # run backend tests
 make lint    # run configured linters
 ```
 
+Equivalent npm commands:
+
+```bash
+npm run dev         # run API and web together
+npm run dev:api     # run FastAPI only
+npm run dev:web     # run Next.js only
+npm run dev:compose # run Docker Compose stack
+```
+
+The frontend defaults to port `2000`. For a temporary override:
+
+```bash
+WEB_PORT=10000 npm run dev:web
+```
+
+See [docs/docker.md](docs/docker.md) for Docker Compose health checks, verification commands, and troubleshooting notes.
+
 ## Next Milestones
 
 1. Add database migrations with Alembic.
@@ -63,4 +87,3 @@ make lint    # run configured linters
 3. Implement read-only exchange market data adapters.
 4. Build paper order lifecycle and portfolio accounting.
 5. Add backtest result persistence and report views.
-

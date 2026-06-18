@@ -1,0 +1,16 @@
+.git
+.next
+node_modules
+apps/web/.next
+apps/web/node_modules
+apps/web/tsconfig.tsbuildinfo
+apps/api/.venv
+apps/api/__pycache__
+**/__pycache__
+**/*.pyc
+.env
+postgres-data
+redis-data
+coverage
+htmlcov
+

@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     log_level: str = "info"
     database_url: str = "postgresql+asyncpg://trader:trader@localhost:5432/trading_framework"
     redis_url: str = "redis://localhost:6379/0"
-    cors_origins: str = "http://localhost:3000"
+    cors_origins: str = "http://localhost:2000"
     enable_live_trading: bool = False
     enable_exchange_writes: bool = False
     default_trading_mode: str = "paper"

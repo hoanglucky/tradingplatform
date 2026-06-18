@@ -13,6 +13,5 @@ COPY apps/web ./apps/web
 COPY packages ./packages
 
 WORKDIR /workspace/apps/web
-EXPOSE 3000
+EXPOSE 2000
 CMD ["npm", "run", "dev"]
-

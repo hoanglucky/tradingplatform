@@ -227,3 +227,122 @@ Continue reviewing docs and implement the next planned work.
 ### Verification notes
 
 - The dev server was stopped after verification.
+
+## 2026-06-18 - Dev command update
+
+### User request
+
+Add `npm run dev` so the server and frontend can be started together.
+
+### Work completed
+
+- Updated root `package.json` scripts:
+  - `npm run dev` starts API and web together.
+  - `npm run dev:api` starts FastAPI.
+  - `npm run dev:web` starts Next.js.
+  - `npm run dev:compose` starts Docker Compose.
+- Added `concurrently` as a root dev dependency.
+- Updated `Makefile`:
+  - `make dev` now runs `npm run dev`.
+  - `make compose` runs Docker Compose.
+- Updated `README.md` with the new local dev commands.
+
+### Notes
+
+- `npm run dev:api` requires the Python API dependencies to be installed in the local Python environment.
+- If local Python setup is not available, use `make compose` after Docker pull/credential access is fixed.
+
+## 2026-06-18 - Frontend port update
+
+### User request
+
+Move the frontend from port `3000` to port `1000` to avoid conflicts with another project.
+
+### Work completed
+
+- Updated `apps/web/package.json` so Next.js dev runs with `--port 1000`.
+- Updated `apps/web/Dockerfile` to expose port `1000`.
+- Updated `docker-compose.yml` web port mapping to `1000:1000`.
+- Updated `.env.example` and API default CORS origin to `http://localhost:1000`.
+- Updated `README.md` local web URL.
+
+### New local URLs
+
+- Frontend: `http://localhost:1000`
+- API: `http://localhost:8000`
+
+### Verification notes
+
+- `npm run lint` passed.
+- `npm run typecheck` passed.
+- `docker compose config --quiet` passed with `.env` generated from `.env.example`.
+- `python3 -m compileall -q apps/api/app` passed.
+- `npm run dev:web` attempted to bind `0.0.0.0:1000` and failed on this Linux host with `EACCES`, because port `1000` is below `1024`.
+- `WEB_PORT` override was added for local fallback when privileged bind is not available.
+
+## 2026-06-18 - Frontend port update to 2000
+
+### User request
+
+Move the frontend from port `1000` to port `2000`.
+
+### Work completed
+
+- Updated `apps/web/package.json` so Next.js dev defaults to `--port 2000`.
+- Updated `apps/web/Dockerfile` to expose port `2000`.
+- Updated `docker-compose.yml` web port mapping to `2000:2000`.
+- Updated `.env.example` and API default CORS origin to `http://localhost:2000`.
+- Updated `README.md` local web URL.
+
+### New local URLs
+
+- Frontend: `http://localhost:2000`
+- API: `http://localhost:8000`
+
+### Verification performed
+
+- `npm run lint` passed.
+- `npm run typecheck` passed.
+- `docker compose config --quiet` passed with `.env` generated from `.env.example`.
+- `npm run dev:web` started successfully at `http://localhost:2000`.
+- HTTP check returned `200 OK` for `/`.
+- The dashboard HTML included `Trading dashboard` and `writes blocked`.
+- The dev server was stopped after verification.
+
+## 2026-06-18 - Day 4 Docker Compose setup hardening
+
+### User request
+
+Continue reviewing docs and implement the next planned work.
+
+### Work completed
+
+- Reviewed the plan, session log, task framework, and Codex task handoff.
+- Confirmed Day 4 Docker Compose setup was the next task.
+- Added root `.dockerignore` to keep the web build context small.
+- Added `apps/api/.dockerignore`.
+- Added `.dockerignore` files for each service build context.
+- Added API healthcheck to `docker-compose.yml`.
+- Added web healthcheck to `docker-compose.yml`.
+- Changed web dependency to wait for API service health.
+- Added `docs/docker.md`.
+- Updated `README.md`, `docs/plan.md`, `docs/task.md`, and `docs/codex-tasks.md`.
+
+### Verification performed
+
+- `docker compose config --quiet` passed with `.env` generated from `.env.example`.
+- `docker pull python:3.12-slim` passed.
+- `docker compose run --build --rm api pytest` was attempted.
+- PostgreSQL and Redis containers started during the Compose test attempt.
+
+### Verification not completed
+
+- Full `docker compose up --build` was not completed.
+- Backend pytest through Docker is still pending.
+- The API image build reached `pip install -r requirements.txt` but stalled while downloading/installing Python dependencies before pytest started.
+- The Compose test attempt was interrupted and `docker compose down` was run to clean up containers and network.
+
+### Safety notes
+
+- No live trading behavior was added.
+- No exchange write behavior was added.
