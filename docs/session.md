@@ -353,3 +353,35 @@ Continue reviewing docs and implement the next planned work.
 
 - No live trading behavior was added.
 - No exchange write behavior was added.
+
+## 2026-06-18 - Day 5 developer commands polish
+
+### User request
+
+Continue implementing Day 5 from the development plan.
+
+### Work completed
+
+- Added `make up` for detached core Docker Compose startup.
+- Added `make api-test` for backend pytest through Docker.
+- Added `make web-test` for frontend lint, typecheck, and build.
+- Updated `make test` to run API and web checks.
+- Updated `make lint` so backend Python linting runs through Docker instead of requiring host Python tooling.
+- Updated `make format` so backend Python formatting runs through Docker.
+- Added npm fallback commands for environments without `make`.
+- Updated README command usage.
+- Updated Day 5 planning and task docs.
+
+### Verification notes
+
+- Direct `make` verification could not run because this environment does not have `make` installed.
+- npm fallback commands will be used for verification in this environment.
+- `npm run api-test` passed with 4 backend tests.
+- `npm run web-test` passed frontend lint, typecheck, and production build.
+- `npm run lint:api` passed through the built API Docker image.
+- `npm test` passed end-to-end by running API and web checks.
+
+### Safety notes
+
+- No live trading behavior was added.
+- No exchange write behavior was added.

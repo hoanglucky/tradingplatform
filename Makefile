@@ -1,11 +1,12 @@
 SHELL := /bin/bash
 
-.PHONY: help setup dev compose compose-services down logs ps web api test lint format clean
+.PHONY: help setup dev up compose compose-services down logs ps web api api-test web-test test lint format clean
 
 help:
 	@printf "Available commands:\n"
 	@printf "  make setup   Create .env and install frontend dependencies\n"
 	@printf "  make dev     Start API and web locally through npm\n"
+	@printf "  make up      Start the core Docker Compose stack in the background\n"
 	@printf "  make compose Start the core Docker Compose stack\n"
 	@printf "  make compose-services Start core stack plus domain service stubs\n"
 	@printf "  make down    Stop the local stack\n"
@@ -13,7 +14,9 @@ help:
 	@printf "  make ps      Show service status\n"
 	@printf "  make web     Run the Next.js app locally\n"
 	@printf "  make api     Run the FastAPI app locally\n"
-	@printf "  make test    Run backend tests\n"
+	@printf "  make api-test Run backend tests in Docker\n"
+	@printf "  make web-test Run frontend checks\n"
+	@printf "  make test    Run API and web checks\n"
 	@printf "  make lint    Run available linters\n"
 	@printf "  make format  Format Python code with ruff if available\n"
 
@@ -23,6 +26,9 @@ setup:
 
 dev:
 	npm run dev
+
+up:
+	docker compose up --build -d
 
 compose:
 	docker compose up --build
@@ -45,15 +51,24 @@ web:
 api:
 	cd apps/api && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
-test:
-	cd apps/api && pytest
+api-test:
+	docker compose run --rm api pytest
+
+web-test:
+	npm --workspace apps/web run lint
+	npm --workspace apps/web run typecheck
+	npm --workspace apps/web run build
+
+test: api-test web-test
 
 lint:
 	npm run lint
-	cd apps/api && ruff check app tests
+	docker compose build api
+	docker run --rm trading-framework-api ruff check app tests
 
 format:
-	cd apps/api && ruff format app tests
+	docker compose build api
+	docker run --rm trading-framework-api ruff format app tests
 
 clean:
 	docker compose down -v

@@ -29,17 +29,16 @@
 
 ## Current review task
 
-Review the Day 4 Docker Compose setup hardening.
+Review the Day 5 developer commands polish.
 
 Focus areas:
 
-- Confirm Docker Compose config validates with `.env.example`.
-- Confirm API and web Dockerfiles exist.
-- Confirm PostgreSQL, Redis, API, and web healthchecks are present.
-- Confirm web waits for API health before starting.
-- Confirm `.dockerignore` files exclude generated files, local env files, and dependency folders.
-- Confirm domain service stubs are isolated behind the Compose `services` profile.
-- Confirm Docker credential issue is documented and not mistaken for an app test failure.
+- Confirm `make dev`, `make up`, `make down`, and `make logs` exist.
+- Confirm `make api-test` runs backend tests through Docker.
+- Confirm `make web-test` runs frontend lint, typecheck, and build.
+- Confirm `make lint` does not require host Python tooling.
+- Confirm README command list matches Makefile.
+- Confirm npm fallback commands exist for environments without `make`.
 - Confirm no live trading or exchange write behavior was added.
 
 ## Verification commands

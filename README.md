@@ -60,14 +60,18 @@ make compose-services
 ```bash
 make setup   # create .env and install frontend dependencies
 make dev     # start FastAPI and Next.js locally through npm
+make up      # start core Docker Compose stack in the background
 make compose # start core services with Docker Compose
 make compose-services # start core stack plus domain service stubs
 make down    # stop containers
 make logs    # tail logs
 make web     # run Next.js outside Compose
 make api     # run FastAPI outside Compose
-make test    # run backend tests
+make api-test # run backend tests in Docker
+make web-test # run frontend lint, typecheck, and build
+make test    # run API and web checks
 make lint    # run configured linters
+make format  # format backend Python code through Docker
 ```
 
 Equivalent npm commands:
@@ -77,7 +81,15 @@ npm run dev         # run API and web together
 npm run dev:api     # run FastAPI only
 npm run dev:web     # run Next.js only
 npm run dev:compose # run Docker Compose stack
+npm run up          # start core Docker Compose stack in the background
+npm run api-test    # run backend tests in Docker
+npm run web-test    # run frontend lint, typecheck, and build
+npm test            # run API and web checks
+npm run lint:api    # run backend ruff lint in Docker
+npm run format:api  # run backend ruff format in Docker
 ```
+
+If `make` is not installed on your machine, use the npm commands above.
 
 The frontend defaults to port `2000`. For a temporary override:
 

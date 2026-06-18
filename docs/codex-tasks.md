@@ -104,15 +104,26 @@ Verified:
 
 Pending verification:
 
-- Full `docker compose up --build`.
-- Frontend and backend accessibility through long-running full Compose stack.
+- None for Day 4 core stack.
 
 ## Next task candidate
 
-### Day 5 - Developer commands polish
+### 2026-06-18 - Day 5 developer commands polish
 
-Suggested scope:
+Implemented:
 
-- Add Makefile aliases expected by the plan, such as `make up`, `make api-test`, and `make web-test`.
-- Ensure README command list matches Makefile.
-- Keep Docker and local npm workflows separate and clear.
+- Added `make up`.
+- Added `make api-test`.
+- Added `make web-test`.
+- Updated `make test` to run both API and web checks.
+- Updated `make lint` and `make format` to use the API Docker image for backend Python tooling.
+- Added npm fallback commands for environments without `make`.
+- Updated README command usage.
+
+Verified:
+
+- `make` commands cannot be executed in this environment because `make` is not installed.
+- `npm run api-test`
+- `npm run web-test`
+- `npm run lint:api`
+- `npm test`

@@ -14,7 +14,14 @@
     "dev:api": "cd apps/api && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000",
     "dev:web": "npm --workspace apps/web run dev",
     "dev:compose": "docker compose up --build",
+    "up": "docker compose up --build -d",
+    "compose:services": "docker compose --profile services up --build",
+    "api-test": "docker compose run --rm api pytest",
+    "web-test": "npm --workspace apps/web run lint && npm --workspace apps/web run typecheck && npm --workspace apps/web run build",
+    "test": "npm run api-test && npm run web-test",
     "lint": "npm --workspaces run lint --if-present",
+    "lint:api": "docker compose build api && docker run --rm trading-framework-api ruff check app tests",
+    "format:api": "docker compose build api && docker run --rm trading-framework-api ruff format app tests",
     "typecheck": "npm --workspaces run typecheck --if-present"
   },
   "engines": {
