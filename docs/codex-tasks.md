@@ -32,6 +32,8 @@ Verified:
 - `npm run lint`
 - `npm run typecheck`
 - `npm --workspace apps/web run build`
+- `npm --workspace apps/web run dev`
+- HTTP 200 checks for `/`, `/markets`, and `/settings`
 - `docker compose config --quiet` after creating `.env` from `.env.example`
 
 Not verified:
@@ -64,11 +66,31 @@ Pending verification:
 
 ## Next task candidate
 
-### Day 3 - Next.js frontend skeleton review and dashboard hardening
+### 2026-06-18 - Day 3 frontend skeleton hardening
+
+Implemented:
+
+- Stable dashboard layout with sidebar and topbar.
+- API health/readiness display.
+- Safety status display with exchange writes blocked.
+- Empty dashboard states for chart/watchlist/signal areas.
+- Placeholder App Router pages for MVP sections.
+- Shared frontend contracts for health and readiness.
+
+Verified:
+
+- `npm run lint`
+- `npm run typecheck`
+- `npm --workspace apps/web run build`
+
+## Next task candidate
+
+### Day 4 - Docker Compose setup verification and hardening
 
 Suggested scope:
 
-- Add stable app layout with sidebar/topbar if desired.
-- Add API health/readiness display.
-- Add empty dashboard states for chart/watchlist areas.
-- Keep no live trading controls visible.
+- Resolve Docker credential issue for image pulls.
+- Run `docker compose up --build`.
+- Verify frontend, backend, PostgreSQL, and Redis are accessible.
+- Run backend pytest inside Docker.
+- Update README with any Docker troubleshooting notes.

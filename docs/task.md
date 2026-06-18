@@ -29,17 +29,16 @@
 
 ## Current review task
 
-Review the Day 2 FastAPI backend skeleton hardening.
+Review the Day 3 Next.js frontend skeleton hardening.
 
 Focus areas:
 
-- Confirm `apps/api/app/api/router.py` is the central API router.
-- Confirm routes live under `apps/api/app/api/routes`.
-- Confirm `/health` stays lightweight.
-- Confirm `/health/ready` checks PostgreSQL and Redis.
-- Confirm `/safety` still blocks live trading and exchange writes by default.
-- Confirm no exchange write or live trading execution was added.
-- Confirm `docs/api.md` matches implemented endpoint contracts.
+- Confirm sidebar navigation covers the planned MVP sections.
+- Confirm topbar and system strip show API health/readiness and safety state.
+- Confirm the main dashboard has empty states for chart, watchlist, and signals.
+- Confirm placeholder routes render for markets, strategies, backtests, paper trading, alerts, and settings.
+- Confirm no live trading controls were added.
+- Confirm exchange writes remain visibly blocked.
 
 ## Verification commands
 

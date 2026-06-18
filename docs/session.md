@@ -171,3 +171,59 @@ failed to solve: error getting credentials
 ```
 
 This should be retried after Docker credential/pull access is fixed.
+
+## 2026-06-18 - Day 3 frontend skeleton hardening
+
+### User request
+
+Continue reviewing docs and implement the next planned work.
+
+### Work completed
+
+- Reviewed `docs/session.md`, `docs/plan.md`, `docs/task.md`, and `docs/codex-tasks.md`.
+- Confirmed Day 3 was the next task candidate.
+- Reworked `apps/web` from a hero-style scaffold into an operational dashboard shell.
+- Added typed frontend API helper:
+  - `apps/web/lib/api.ts`
+- Added reusable frontend components:
+  - `apps/web/components/AppShell.tsx`
+  - `apps/web/components/EmptySection.tsx`
+  - `apps/web/components/SectionPage.tsx`
+- Added dashboard routing:
+  - `/`
+  - `/markets`
+  - `/strategies`
+  - `/backtests`
+  - `/paper`
+  - `/alerts`
+  - `/settings`
+- Added shared TypeScript contracts for:
+  - `HealthStatus`
+  - `DependencyStatus`
+  - `ReadinessStatus`
+- Updated dashboard CSS for:
+  - Sidebar
+  - Topbar
+  - API health strip
+  - Main dashboard content
+  - Empty state panels
+  - Responsive mobile layout
+
+### Safety notes
+
+- No live trading controls were added.
+- Exchange writes remain shown as blocked.
+- Strategy and paper trading UI areas are placeholders only.
+
+### Verification performed
+
+- `npm run lint` passed.
+- `npm run typecheck` passed.
+- `npm --workspace apps/web run build` passed.
+- `npm --workspace apps/web run dev` started successfully at `http://localhost:3000`.
+- HTTP checks returned `200 OK` for `/`, `/markets`, and `/settings`.
+- The dashboard HTML included `Trading dashboard`, `writes blocked`, and `Candlestick workspace`.
+
+### Verification notes
+
+- The dev server was stopped after verification.

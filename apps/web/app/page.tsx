@@ -1,74 +1,64 @@
 import { Badge, Panel } from "@trading-framework/ui";
-import type { ModuleStatus, SafetyStatus } from "@trading-framework/shared";
-
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
-
-async function fetchJson<T>(path: string, fallback: T): Promise<T> {
-  try {
-    const response = await fetch(`${apiBaseUrl}${path}`, { next: { revalidate: 5 } });
-    if (!response.ok) {
-      return fallback;
-    }
-    return (await response.json()) as T;
-  } catch {
-    return fallback;
-  }
-}
+import { AppShell } from "../components/AppShell";
+import { EmptySection } from "../components/EmptySection";
+import { getDashboardData } from "../lib/api";
 
 export default async function Home() {
-  const [modules, safety] = await Promise.all([
-    fetchJson<ModuleStatus[]>("/modules", []),
-    fetchJson<SafetyStatus>("/safety", {
-      default_trading_mode: "paper",
-      live_trading_enabled: false,
-      exchange_writes_allowed: false,
-      exchange_adapter_mode: "read_only",
-    }),
-  ]);
+  const [health, readiness, safety, modules] = await getDashboardData();
 
   return (
-    <main className="shell">
-      <section className="masthead">
-        <div>
-          <p className="eyebrow">Trading Framework</p>
-          <h1>Paper-first trading MVP foundation</h1>
-          <p className="lede">
-            A modular starter for market data, indicators, strategies, backtests, simulated execution,
-            alerts, and read-only exchange connectivity.
-          </p>
-        </div>
-        <Panel className="status-panel">
-          <div className="status-row">
-            <span>Mode</span>
-            <Badge tone="success">{safety.default_trading_mode}</Badge>
-          </div>
-          <div className="status-row">
-            <span>Live trading</span>
-            <Badge tone={safety.live_trading_enabled ? "danger" : "neutral"}>
-              {safety.live_trading_enabled ? "enabled" : "disabled"}
-            </Badge>
-          </div>
-          <div className="status-row">
-            <span>Exchange writes</span>
-            <Badge tone={safety.exchange_writes_allowed ? "danger" : "neutral"}>
-              {safety.exchange_writes_allowed ? "allowed" : "blocked"}
-            </Badge>
-          </div>
-        </Panel>
-      </section>
+    <AppShell health={health} readiness={readiness} safety={safety}>
+      <main className="dashboard-grid">
+        <section className="primary-column">
+          <EmptySection
+            title="Candlestick workspace"
+            description="Chart integration starts after the dashboard skeleton is stable."
+            items={["Symbol selector", "Timeframe selector", "Realtime status", "Indicator overlays"]}
+          />
+          <section className="module-grid" aria-label="System modules">
+            {modules.map((module) => (
+              <Panel key={module.name}>
+                <div className="module-header">
+                  <h2>{module.name}</h2>
+                  <Badge tone={module.status === "read_only" ? "success" : "neutral"}>{module.status}</Badge>
+                </div>
+                <p>{module.role}</p>
+              </Panel>
+            ))}
+          </section>
+        </section>
 
-      <section className="module-grid" aria-label="System modules">
-        {modules.map((module) => (
-          <Panel key={module.name}>
-            <div className="module-header">
-              <h2>{module.name}</h2>
-              <Badge tone={module.status === "read_only" ? "success" : "neutral"}>{module.status}</Badge>
+        <aside className="side-column" aria-label="Dashboard side panels">
+          <Panel className="status-panel">
+            <div className="status-row">
+              <span>Live trading</span>
+              <Badge tone={safety.live_trading_enabled ? "danger" : "success"}>
+                {safety.live_trading_enabled ? "enabled" : "disabled"}
+              </Badge>
             </div>
-            <p>{module.role}</p>
+            <div className="status-row">
+              <span>Exchange writes</span>
+              <Badge tone={safety.exchange_writes_allowed ? "danger" : "success"}>
+                {safety.exchange_writes_allowed ? "allowed" : "blocked"}
+              </Badge>
+            </div>
+            <div className="status-row">
+              <span>Adapter mode</span>
+              <Badge tone="neutral">{safety.exchange_adapter_mode}</Badge>
+            </div>
           </Panel>
-        ))}
-      </section>
-    </main>
+          <EmptySection
+            title="Watchlist"
+            description="Pinned symbols will appear here."
+            items={["BTCUSDT", "ETHUSDT", "Add/remove controls"]}
+          />
+          <EmptySection
+            title="Latest signals"
+            description="Strategy signals will stay paper-only in the MVP."
+            items={["Signal table", "Confidence", "Generated time"]}
+          />
+        </aside>
+      </main>
+    </AppShell>
   );
 }
-

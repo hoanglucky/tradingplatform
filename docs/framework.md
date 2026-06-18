@@ -50,8 +50,10 @@ The repository is a scaffolded trading MVP framework with:
 
 Frontend:
 
-- Reads backend module and safety status.
-- Displays a first-pass dashboard foundation.
+- Reads backend health, readiness, module, and safety status.
+- Displays an operational dashboard shell with sidebar and topbar.
+- Provides placeholder routes for markets, strategies, backtests, paper trading, alerts, and settings.
+- Keeps all trading interactions in read-only or paper-first placeholder state.
 
 Backend API:
 
