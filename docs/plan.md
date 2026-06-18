@@ -240,11 +240,11 @@ Add a simple test for /health.
 * [x] CORS setup exists
 * [x] Environment config loading exists
 * [x] Backend syntax compile check passed
-* [ ] Pytest verified in local Python/Docker environment
+* [x] Pytest verified in Docker environment
 
 **Implementation note - 2026-06-18:**
 
-The API skeleton has been hardened with the planned `app/api/routes` structure, central router, logging setup, `/health`, `/health/ready`, `/safety`, and `/modules`. Docker pytest was attempted but did not reach test execution because BuildKit failed resolving `python:3.12-slim` credentials. Retry `docker compose run --rm api pytest` after Docker pull access is fixed.
+The API skeleton has been hardened with the planned `app/api/routes` structure, central router, logging setup, `/health`, `/health/ready`, `/safety`, and `/modules`. Backend pytest now passes in Docker with `docker compose run --rm api pytest`.
 
 ---
 
@@ -317,15 +317,17 @@ Update README with local setup instructions.
 * [x] API healthcheck exists
 * [x] Web healthcheck exists
 * [x] Docker build contexts ignore generated/local files
+* [x] Domain service stubs isolated behind Compose `services` profile
 * [ ] `docker compose up` works
-* [ ] Frontend accessible
-* [ ] Backend accessible
+* [ ] Frontend accessible through full `docker compose up`
+* [ ] Backend accessible through full `docker compose up`
 * [x] PostgreSQL starts during Compose test attempt
 * [x] Redis starts during Compose test attempt
+* [x] Backend pytest passes through Docker Compose
 
 **Implementation note - 2026-06-18:**
 
-Docker Compose has been hardened with API/web health checks and `.dockerignore` files for root, API, and service build contexts. `docker compose config --quiet` validates. `docker pull python:3.12-slim` now works, and PostgreSQL/Redis started during the Compose test attempt. Full `docker compose up --build` and backend pytest through Docker remain pending because the API image build stalled during Python dependency installation before pytest started.
+Docker Compose has been hardened with API/web health checks, `.dockerignore` files for root/API/service build contexts, and a `services` profile for domain service stubs. `docker compose config --quiet` validates. `docker pull python:3.12-slim` works, API image build completes, PostgreSQL/Redis start during Compose test runs, and backend pytest passes in Docker. Full long-running `docker compose up --build` browser/API accessibility verification is still pending.
 
 ---
 

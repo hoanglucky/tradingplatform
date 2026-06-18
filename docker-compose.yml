@@ -88,6 +88,8 @@ services:
       start_period: 20s
 
   market-data:
+    profiles:
+      - services
     build:
       context: ./services/market-data
     env_file:
@@ -97,6 +99,8 @@ services:
         condition: service_healthy
 
   indicator-engine:
+    profiles:
+      - services
     build:
       context: ./services/indicator-engine
     env_file:
@@ -106,6 +110,8 @@ services:
         condition: service_healthy
 
   strategy-engine:
+    profiles:
+      - services
     build:
       context: ./services/strategy-engine
     env_file:
@@ -115,6 +121,8 @@ services:
         condition: service_healthy
 
   backtest-engine:
+    profiles:
+      - services
     build:
       context: ./services/backtest-engine
     env_file:
@@ -124,6 +132,8 @@ services:
         condition: service_healthy
 
   paper-trading:
+    profiles:
+      - services
     build:
       context: ./services/paper-trading
     env_file:
@@ -135,6 +145,8 @@ services:
         condition: service_healthy
 
   alert-engine:
+    profiles:
+      - services
     build:
       context: ./services/alert-engine
     env_file:
@@ -144,6 +156,8 @@ services:
         condition: service_healthy
 
   exchange-adapters:
+    profiles:
+      - services
     build:
       context: ./services/exchange-adapters
     env_file:

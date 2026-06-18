@@ -1,12 +1,13 @@
 SHELL := /bin/bash
 
-.PHONY: help setup dev down logs ps web api test lint format clean
+.PHONY: help setup dev compose compose-services down logs ps web api test lint format clean
 
 help:
 	@printf "Available commands:\n"
 	@printf "  make setup   Create .env and install frontend dependencies\n"
 	@printf "  make dev     Start API and web locally through npm\n"
-	@printf "  make compose Start the full local stack with Docker Compose\n"
+	@printf "  make compose Start the core Docker Compose stack\n"
+	@printf "  make compose-services Start core stack plus domain service stubs\n"
 	@printf "  make down    Stop the local stack\n"
 	@printf "  make logs    Tail Docker Compose logs\n"
 	@printf "  make ps      Show service status\n"
@@ -25,6 +26,9 @@ dev:
 
 compose:
 	docker compose up --build
+
+compose-services:
+	docker compose --profile services up --build
 
 down:
 	docker compose down

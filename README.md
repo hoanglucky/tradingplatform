@@ -43,10 +43,16 @@ The local stack exposes:
 - PostgreSQL: `localhost:5432`
 - Redis: `localhost:6379`
 
-`make dev` runs the API and web app locally through `npm run dev`. For the full Docker Compose stack, use:
+`make dev` runs the API and web app locally through `npm run dev`. For the core Docker Compose stack, use:
 
 ```bash
 make compose
+```
+
+To include the domain service stubs as well:
+
+```bash
+make compose-services
 ```
 
 ## Development Commands
@@ -54,7 +60,8 @@ make compose
 ```bash
 make setup   # create .env and install frontend dependencies
 make dev     # start FastAPI and Next.js locally through npm
-make compose # start all services with Docker Compose
+make compose # start core services with Docker Compose
+make compose-services # start core stack plus domain service stubs
 make down    # stop containers
 make logs    # tail logs
 make web     # run Next.js outside Compose

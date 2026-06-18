@@ -61,8 +61,7 @@ Verified:
 
 Pending verification:
 
-- Run backend pytest in Docker or a Python environment with `pip`/`venv`.
-- Docker pytest was attempted but blocked by Docker BuildKit credential resolution for `python:3.12-slim`.
+- Host Python pytest remains unavailable because host Python lacks `pip`/`venv`.
 
 ## Next task candidate
 
@@ -90,6 +89,8 @@ Implemented:
 - Added `.dockerignore` files for root, API, and service build contexts.
 - Added API and web health checks to `docker-compose.yml`.
 - Made web depend on API service health.
+- Moved domain service stubs behind the Compose `services` profile.
+- Updated the API Dockerfile to include tests and set `PYTHONPATH=/app`.
 - Added `docs/docker.md` with Compose usage, health checks, verification commands, and Docker credential troubleshooting.
 - Updated README and task docs.
 
@@ -98,12 +99,13 @@ Verified:
 - `docker compose config --quiet`
 - `docker pull python:3.12-slim`
 - PostgreSQL and Redis containers started during `docker compose run --build --rm api pytest`
+- `docker compose build api`
+- `docker compose run --rm api pytest` passed with 4 tests
 
 Pending verification:
 
 - Full `docker compose up --build`.
-- Backend pytest through Docker.
-- The latest Compose pytest attempt stalled during Python dependency installation in the API image before pytest started.
+- Frontend and backend accessibility through long-running full Compose stack.
 
 ## Next task candidate
 

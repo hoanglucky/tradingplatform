@@ -241,7 +241,7 @@ Add `npm run dev` so the server and frontend can be started together.
   - `npm run dev:api` starts FastAPI.
   - `npm run dev:web` starts Next.js.
   - `npm run dev:compose` starts Docker Compose.
-- Added `concurrently` as a root dev dependency.
+- Implemented `npm run dev` with a simple shell command so no extra process-runner dependency is needed.
 - Updated `Makefile`:
   - `make dev` now runs `npm run dev`.
   - `make compose` runs Docker Compose.
@@ -325,6 +325,9 @@ Continue reviewing docs and implement the next planned work.
 - Added API healthcheck to `docker-compose.yml`.
 - Added web healthcheck to `docker-compose.yml`.
 - Changed web dependency to wait for API service health.
+- Moved domain service stubs behind the Compose `services` profile so the default Day 4 stack only includes PostgreSQL, Redis, API, and web.
+- Updated `apps/api/Dockerfile` to set `PYTHONPATH=/app`.
+- Updated `apps/api/Dockerfile` to copy `tests/` into the image.
 - Added `docs/docker.md`.
 - Updated `README.md`, `docs/plan.md`, `docs/task.md`, and `docs/codex-tasks.md`.
 
@@ -332,15 +335,19 @@ Continue reviewing docs and implement the next planned work.
 
 - `docker compose config --quiet` passed with `.env` generated from `.env.example`.
 - `docker pull python:3.12-slim` passed.
-- `docker compose run --build --rm api pytest` was attempted.
-- PostgreSQL and Redis containers started during the Compose test attempt.
+- `docker compose --profile services config --quiet` passed with `.env` generated from `.env.example`.
+- `docker compose build api` passed.
+- `docker compose run --rm api pytest` passed with 4 tests.
+- PostgreSQL and Redis containers started and became healthy during Compose test runs.
+- `npm run lint` passed.
+- `npm run typecheck` passed.
+- `python3 -m compileall -q apps/api/app` passed.
 
 ### Verification not completed
 
 - Full `docker compose up --build` was not completed.
-- Backend pytest through Docker is still pending.
-- The API image build reached `pip install -r requirements.txt` but stalled while downloading/installing Python dependencies before pytest started.
-- The Compose test attempt was interrupted and `docker compose down` was run to clean up containers and network.
+- Frontend and backend accessibility through the long-running full Compose stack is still pending.
+- `docker compose down` was run after test verification to clean up containers and network.
 
 ### Safety notes
 

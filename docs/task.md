@@ -23,7 +23,7 @@
 - [x] README/docs updated
 - [x] No hardcoded secrets
 - [x] No live trading execution
-- [ ] Backend pytest completed in local Python/Docker environment
+- [x] Backend pytest completed in Docker environment
 - [x] Backend syntax compile check passed
 - [x] npm audit reviewed or accepted for current Next.js transitive advisory
 
@@ -38,6 +38,7 @@ Focus areas:
 - Confirm PostgreSQL, Redis, API, and web healthchecks are present.
 - Confirm web waits for API health before starting.
 - Confirm `.dockerignore` files exclude generated files, local env files, and dependency folders.
+- Confirm domain service stubs are isolated behind the Compose `services` profile.
 - Confirm Docker credential issue is documented and not mistaken for an app test failure.
 - Confirm no live trading or exchange write behavior was added.
 
@@ -61,5 +62,6 @@ docker compose run --rm api pytest
 Current blocker:
 
 - Docker can now pull `python:3.12-slim`.
-- The latest Compose pytest attempt stalled during API image Python dependency installation before pytest started.
+- API image build now completes.
+- `docker compose run --rm api pytest` passes.
 - Host Python does not have `pip`/`venv`, so pytest cannot run directly on the host yet.

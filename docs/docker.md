@@ -8,7 +8,7 @@ Create the local environment file:
 cp .env.example .env
 ```
 
-Start the full Compose stack:
+Start the core Compose stack:
 
 ```bash
 make compose
@@ -18,6 +18,25 @@ Equivalent npm command:
 
 ```bash
 npm run dev:compose
+```
+
+The default Compose stack includes:
+
+- `postgres`
+- `redis`
+- `api`
+- `web`
+
+Domain service stubs are behind the `services` profile so Day 4 stays focused on the core development stack. To start everything:
+
+```bash
+make compose-services
+```
+
+Equivalent raw Compose command:
+
+```bash
+docker compose --profile services up --build
 ```
 
 Expected local URLs:
@@ -100,5 +119,6 @@ docker compose run --rm api pytest
 Current follow-up note:
 
 - `docker pull python:3.12-slim` later succeeded.
-- `docker compose run --build --rm api pytest` then started PostgreSQL and Redis, but the API image build stalled during Python dependency installation before pytest began.
-- Retry the Compose pytest command after Docker/network package downloads are stable.
+- `docker compose build api` later succeeded.
+- `docker compose run --rm api pytest` later passed with 4 tests.
+- The remaining Day 4 check is long-running `docker compose up --build` accessibility verification for web/API.
