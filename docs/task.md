@@ -23,22 +23,23 @@
 - [x] README/docs updated
 - [x] No hardcoded secrets
 - [x] No live trading execution
-- [ ] Backend tests verified in local Python/Docker environment
-- [ ] npm audit reviewed or accepted for current Next.js transitive advisory
+- [ ] Backend pytest completed in local Python/Docker environment
+- [x] Backend syntax compile check passed
+- [x] npm audit reviewed or accepted for current Next.js transitive advisory
 
 ## Current review task
 
-Review the Day 1 foundation scaffold.
+Review the Day 2 FastAPI backend skeleton hardening.
 
 Focus areas:
 
-- Confirm repo structure matches product plan.
-- Confirm Docker Compose service names and dependencies are clear.
-- Confirm `.env.example` keeps all trading safety switches off by default.
-- Confirm exchange adapters are read-only by default.
-- Confirm no live order execution exists.
-- Confirm `apps/api` route shape is acceptable before deeper backend work.
-- Confirm `apps/web` first screen is a useful MVP dashboard foundation.
+- Confirm `apps/api/app/api/router.py` is the central API router.
+- Confirm routes live under `apps/api/app/api/routes`.
+- Confirm `/health` stays lightweight.
+- Confirm `/health/ready` checks PostgreSQL and Redis.
+- Confirm `/safety` still blocks live trading and exchange writes by default.
+- Confirm no exchange write or live trading execution was added.
+- Confirm `docs/api.md` matches implemented endpoint contracts.
 
 ## Verification commands
 
@@ -56,3 +57,8 @@ Backend tests:
 ```bash
 docker compose run --rm api pytest
 ```
+
+Current blocker:
+
+- Docker BuildKit failed resolving `python:3.12-slim` with `error getting credentials`.
+- Host Python does not have `pip`/`venv`, so pytest cannot run directly on the host yet.

@@ -234,11 +234,17 @@ Add a simple test for /health.
 * [x] API scaffold exists
 * [x] `/health` endpoint implemented
 * [x] Test for health check added
-* [ ] Test for health check verified in local Python environment
+* [x] `app/api/routes/health.py` exists
+* [x] `app/api/router.py` exists
+* [x] `app/core/logging.py` exists
+* [x] CORS setup exists
+* [x] Environment config loading exists
+* [x] Backend syntax compile check passed
+* [ ] Pytest verified in local Python/Docker environment
 
 **Implementation note - 2026-06-18:**
 
-The API skeleton exists, but the local host does not currently have `pip` or `venv`, so pytest was not executed outside Docker. Run `docker compose run --rm api pytest` after `make setup`.
+The API skeleton has been hardened with the planned `app/api/routes` structure, central router, logging setup, `/health`, `/health/ready`, `/safety`, and `/modules`. Docker pytest was attempted but did not reach test execution because BuildKit failed resolving `python:3.12-slim` credentials. Retry `docker compose run --rm api pytest` after Docker pull access is fixed.
 
 ---
 

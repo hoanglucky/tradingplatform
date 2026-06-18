@@ -113,3 +113,61 @@ docker compose run --rm api pytest
 Day 1 project foundation is implemented and ready for review.
 
 Next recommended task: Day 2 backend skeleton hardening.
+
+## 2026-06-18 - Day 2 backend skeleton hardening
+
+### User request
+
+Continue implementing Day 2 from the development plan.
+
+### Work completed
+
+- Added backend API package structure:
+  - `apps/api/app/api/__init__.py`
+  - `apps/api/app/api/router.py`
+  - `apps/api/app/api/routes/__init__.py`
+  - `apps/api/app/api/routes/health.py`
+  - `apps/api/app/api/routes/modules.py`
+  - `apps/api/app/api/routes/safety.py`
+- Added `apps/api/app/core/logging.py`.
+- Added `apps/api/app/schemas/health.py`.
+- Updated `apps/api/app/main.py` to use the central API router.
+- Removed old `apps/api/app/routers/*` route files to avoid duplicate route ownership.
+- Added `/health/ready` readiness endpoint for PostgreSQL and Redis checks.
+- Expanded API tests for:
+  - `/health`
+  - `/health/ready` ready state
+  - `/health/ready` degraded state
+  - `/safety` defaults
+- Added `docs/api.md`.
+- Updated `docs/plan.md`, `docs/task.md`, and `docs/codex-tasks.md`.
+
+### Safety notes
+
+- No live trading was implemented.
+- No exchange write path was added.
+- `/safety` still reports paper/read-only defaults.
+
+### Verification performed
+
+- `npm run lint` passed.
+- `npm run typecheck` passed.
+- `python3 -m compileall -q apps/api/app` passed.
+- `docker compose config --quiet` passed with `.env` generated from `.env.example`.
+- `npm audit --audit-level=moderate` still reports the known Next.js transitive `postcss` advisory. npm's suggested fix downgrades Next.js to 9.3.3, so it was reviewed and not applied.
+
+### Verification not completed
+
+Backend pytest was attempted with Docker:
+
+```bash
+docker compose run --rm api pytest
+```
+
+It did not reach pytest because Docker Desktop/BuildKit failed while resolving `python:3.12-slim`:
+
+```txt
+failed to solve: error getting credentials
+```
+
+This should be retried after Docker credential/pull access is fixed.

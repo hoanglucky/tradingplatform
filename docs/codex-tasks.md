@@ -38,18 +38,37 @@ Not verified:
 
 - Backend pytest on host due missing Python `pip`/`venv`.
 
-## Next task candidate
+### 2026-06-18 - Day 2 backend skeleton hardening
 
-### Day 2 - Backend skeleton hardening
+Implemented:
 
-Suggested scope:
-
-- Align API folders with planned structure:
+- Aligned API folders with planned structure:
   - `app/api/routes`
   - `app/api/router.py`
   - `app/core/logging.py`
-- Add structured logging.
-- Add test execution through Docker Compose.
-- Add API documentation in `docs/api.md`.
-- Add a health check that can optionally verify PostgreSQL and Redis connectivity.
+- Added structured logging setup.
+- Added `/health/ready` for PostgreSQL and Redis readiness checks.
+- Added API endpoint documentation in `docs/api.md`.
+- Added tests for health, readiness, and safety defaults.
 
+Verified:
+
+- `npm run lint`
+- `npm run typecheck`
+- `python3 -m compileall -q apps/api/app`
+
+Pending verification:
+
+- Run backend pytest in Docker or a Python environment with `pip`/`venv`.
+- Docker pytest was attempted but blocked by Docker BuildKit credential resolution for `python:3.12-slim`.
+
+## Next task candidate
+
+### Day 3 - Next.js frontend skeleton review and dashboard hardening
+
+Suggested scope:
+
+- Add stable app layout with sidebar/topbar if desired.
+- Add API health/readiness display.
+- Add empty dashboard states for chart/watchlist areas.
+- Keep no live trading controls visible.
