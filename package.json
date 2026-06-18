@@ -1,0 +1,21 @@
+{
+  "name": "trading-framework",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Modular web trading MVP foundation with Next.js, FastAPI, PostgreSQL, Redis, and Docker Compose.",
+  "packageManager": "npm@10.8.0",
+  "workspaces": [
+    "apps/web",
+    "packages/shared",
+    "packages/ui"
+  ],
+  "scripts": {
+    "dev": "docker compose up --build",
+    "dev:web": "npm --workspace apps/web run dev",
+    "lint": "npm --workspaces run lint --if-present",
+    "typecheck": "npm --workspaces run typecheck --if-present"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

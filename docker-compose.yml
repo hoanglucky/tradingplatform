@@ -1,0 +1,136 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: trader
+      POSTGRES_PASSWORD: trader
+      POSTGRES_DB: trading_framework
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trader -d trading_framework"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ./apps/api
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./apps/api/app:/app/app
+
+  web:
+    build:
+      context: .
+      dockerfile: ./apps/web/Dockerfile
+    env_file:
+      - .env
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+    volumes:
+      - ./apps/web:/workspace/apps/web
+      - ./packages:/workspace/packages
+      - /workspace/node_modules
+      - /workspace/apps/web/node_modules
+
+  market-data:
+    build:
+      context: ./services/market-data
+    env_file:
+      - .env
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  indicator-engine:
+    build:
+      context: ./services/indicator-engine
+    env_file:
+      - .env
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  strategy-engine:
+    build:
+      context: ./services/strategy-engine
+    env_file:
+      - .env
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  backtest-engine:
+    build:
+      context: ./services/backtest-engine
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  paper-trading:
+    build:
+      context: ./services/paper-trading
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  alert-engine:
+    build:
+      context: ./services/alert-engine
+    env_file:
+      - .env
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  exchange-adapters:
+    build:
+      context: ./services/exchange-adapters
+    env_file:
+      - .env
+    environment:
+      EXCHANGE_ADAPTER_MODE: read_only
+      ENABLE_EXCHANGE_WRITES: "false"
+    depends_on:
+      redis:
+        condition: service_healthy
+
+volumes:
+  postgres-data:
+  redis-data:
+

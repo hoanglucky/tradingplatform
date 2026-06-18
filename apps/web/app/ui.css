@@ -1,0 +1,34 @@
+.tf-panel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 18px;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.05);
+}
+
+.tf-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  border-radius: 999px;
+  padding: 0 10px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.tf-badge-neutral {
+  background: #eef2f6;
+  color: #405161;
+}
+
+.tf-badge-success {
+  background: #dff7ef;
+  color: #0f6b57;
+}
+
+.tf-badge-danger {
+  background: #fee4df;
+  color: #9f1f17;
+}
+
