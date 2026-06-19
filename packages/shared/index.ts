@@ -32,7 +32,7 @@ export type ReadinessStatus = {
 export type Candle = {
   symbol: string;
   timeframe: string;
-  openedAt: string;
+  timestamp: string;
   open: number;
   high: number;
   low: number;

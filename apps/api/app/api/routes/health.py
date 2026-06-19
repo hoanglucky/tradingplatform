@@ -2,10 +2,9 @@ from typing import Literal
 
 from fastapi import APIRouter
 from redis.asyncio import Redis
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.core.config import settings
+from app.db.session import check_database_connection
 from app.schemas.health import DependencyStatus, HealthStatus, ReadinessStatus
 
 router = APIRouter(tags=["health"])
@@ -35,14 +34,10 @@ async def readiness() -> ReadinessStatus:
 
 
 async def check_postgres() -> DependencyStatus:
-    engine = create_async_engine(settings.database_url, pool_pre_ping=True)
     try:
-        async with engine.connect() as connection:
-            await connection.execute(text("SELECT 1"))
+        await check_database_connection()
     except Exception as exc:
         return DependencyStatus(name="postgres", status="error", detail=exc.__class__.__name__)
-    finally:
-        await engine.dispose()
 
     return DependencyStatus(name="postgres", status="ok")
 
@@ -57,4 +52,3 @@ async def check_redis() -> DependencyStatus:
         await client.aclose()
 
     return DependencyStatus(name="redis", status="ok")
-

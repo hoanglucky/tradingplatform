@@ -131,6 +131,60 @@ Example response:
 ]
 ```
 
+## Symbol endpoints
+
+These endpoints manage the MVP symbol catalog stored in PostgreSQL. They do not place orders and do not connect to exchange write APIs.
+
+### `GET /symbols`
+
+Lists symbols.
+
+Query parameters:
+
+- `limit`: default `100`, max `500`
+- `offset`: default `0`
+- `active_only`: default `false`
+
+### `GET /symbols/{symbol_id}`
+
+Returns one symbol by UUID. Returns `404` when the symbol does not exist.
+
+### `POST /symbols`
+
+Creates a symbol.
+
+Example request:
+
+```json
+{
+  "exchange": "binance",
+  "symbol": "BTCUSDT",
+  "base_asset": "BTC",
+  "quote_asset": "USDT",
+  "is_active": true
+}
+```
+
+Returns `409` when the same `exchange + symbol` already exists.
+
+### `PATCH /symbols/{symbol_id}`
+
+Updates one or more symbol fields.
+
+Example request:
+
+```json
+{
+  "is_active": false
+}
+```
+
+Returns `404` when the symbol does not exist and `409` when the update would duplicate another symbol.
+
+### `DELETE /symbols/{symbol_id}`
+
+Deletes a symbol. Returns `204` on success or `404` when the symbol does not exist.
+
 ## Day 2 implementation notes
 
 Backend route structure:
@@ -151,4 +205,3 @@ apps/api/app/
 ```
 
 The API currently has no authentication layer. Add auth before introducing user-specific portfolio, watchlist, exchange credential, or account data endpoints.
-

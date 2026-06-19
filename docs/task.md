@@ -29,16 +29,20 @@
 
 ## Current review task
 
-Review the Day 5 developer commands polish.
+Review the Day 12 Binance and Oanda market-data adapters.
 
 Focus areas:
 
-- Confirm `make dev`, `make up`, `make down`, and `make logs` exist.
-- Confirm `make api-test` runs backend tests through Docker.
-- Confirm `make web-test` runs frontend lint, typecheck, and build.
-- Confirm `make lint` does not require host Python tooling.
-- Confirm README command list matches Makefile.
-- Confirm npm fallback commands exist for environments without `make`.
+- Confirm `BinancePublicMarketDataProvider` exists.
+- Confirm `OandaMarketDataProvider` exists.
+- Confirm it implements public symbol, historical kline, and latest price methods.
+- Confirm klines are converted into the internal `Candle` schema.
+- Confirm Oanda candles are converted into the internal `Candle` schema.
+- Confirm Oanda reads `OANDA_API_TOKEN`, `OANDA_ACCOUNT_ID`, and `OANDA_ENVIRONMENT`.
+- Confirm invalid timeframe and invalid time range are rejected before requests.
+- Confirm Binance and Oanda API errors are wrapped as adapter errors.
+- Confirm tests use mocked HTTP responses and do not call external APIs over the network.
+- Confirm no signed trading endpoint, order endpoint, or live trading behavior was added.
 - Confirm no live trading or exchange write behavior was added.
 
 ## Verification commands
@@ -55,12 +59,32 @@ docker compose config --quiet
 Backend tests:
 
 ```bash
-docker compose run --rm api pytest
+npm run api-test
+```
+
+Market-data service tests:
+
+```bash
+npm run market-data-test
+```
+
+Seed command:
+
+```bash
+npm run seed
+```
+
+Database migrations:
+
+```bash
+npm run db:upgrade
+npm run db:current
 ```
 
 Current blocker:
 
 - Docker can now pull `python:3.12-slim`.
 - API image build now completes.
-- `docker compose run --rm api pytest` passes.
+- `npm run api-test` applies Alembic migrations and runs pytest.
+- API tests run with `APP_ENV=test` so SQLAlchemy uses `NullPool` and avoids asyncpg event-loop reuse issues in pytest.
 - Host Python does not have `pip`/`venv`, so pytest cannot run directly on the host yet.

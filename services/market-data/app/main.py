@@ -1,14 +1,6 @@
 from fastapi import FastAPI
-from pydantic_settings import BaseSettings, SettingsConfigDict
 
-
-class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
-    redis_url: str = "redis://localhost:6379/0"
-    service_name: str = "market-data"
-
-
-settings = Settings()
+from app.config import settings
 app = FastAPI(title="Market Data Service", version="0.1.0")
 
 
@@ -19,5 +11,12 @@ async def health() -> dict[str, str]:
 
 @app.get("/capabilities")
 async def capabilities() -> dict[str, list[str]]:
-    return {"capabilities": ["quote-normalization", "candle-ingestion", "market-data-events"]}
-
+    return {
+        "capabilities": [
+            "market-data-provider-interface",
+            "oanda-read-only-candles",
+            "quote-normalization",
+            "candle-ingestion",
+            "market-data-events",
+        ]
+    }

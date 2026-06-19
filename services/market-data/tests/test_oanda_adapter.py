@@ -1,0 +1,156 @@
+from __future__ import annotations
+
+from datetime import UTC, datetime
+from decimal import Decimal
+from urllib.parse import parse_qs
+
+import httpx
+import pytest
+
+from app.adapters.oanda import (
+    OandaAdapterError,
+    OandaConfigurationError,
+    OandaMarketDataProvider,
+    OandaValidationError,
+)
+
+
+@pytest.fixture
+def anyio_backend() -> str:
+    return "asyncio"
+
+
+@pytest.mark.anyio
+async def test_fetches_oanda_candles_as_internal_schema() -> None:
+    seen_params: dict[str, list[str]] = {}
+    seen_auth = ""
+    seen_path = ""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal seen_params, seen_auth, seen_path
+        seen_path = request.url.path
+        seen_params = parse_qs(request.url.query.decode())
+        seen_auth = request.headers["Authorization"]
+        return httpx.Response(
+            200,
+            json={
+                "instrument": "XAU_USD",
+                "granularity": "M1",
+                "candles": [
+                    {
+                        "complete": True,
+                        "volume": 42,
+                        "time": "2024-06-19T08:00:00.000000000Z",
+                        "mid": {
+                            "o": "2310.10",
+                            "h": "2312.20",
+                            "l": "2309.90",
+                            "c": "2311.50",
+                        },
+                    },
+                    {
+                        "complete": False,
+                        "volume": 1,
+                        "time": "2024-06-19T08:01:00.000000000Z",
+                        "mid": {
+                            "o": "1",
+                            "h": "1",
+                            "l": "1",
+                            "c": "1",
+                        },
+                    },
+                ],
+            },
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler), base_url="https://api-fxpractice.oanda.com") as client:
+        provider = OandaMarketDataProvider(api_token="token", client=client)
+        candles = await provider.get_historical_candles(
+            "XAUUSD",
+            "1m",
+            datetime(2024, 6, 19, 8, 0, tzinfo=UTC),
+            datetime(2024, 6, 19, 9, 0, tzinfo=UTC),
+        )
+
+    assert seen_path == "/v3/instruments/XAU_USD/candles"
+    assert seen_auth == "Bearer token"
+    assert seen_params["granularity"] == ["M1"]
+    assert seen_params["price"] == ["M"]
+    assert candles[0].symbol == "XAUUSD"
+    assert candles[0].timeframe == "1m"
+    assert candles[0].timestamp == datetime(2024, 6, 19, 8, 0, tzinfo=UTC)
+    assert candles[0].close == Decimal("2311.50")
+    assert len(candles) == 1
+
+
+@pytest.mark.anyio
+async def test_fetches_oanda_account_instruments_when_account_id_is_configured() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/v3/accounts/abc/instruments"
+        return httpx.Response(
+            200,
+            json={
+                "instruments": [
+                    {"name": "XAU_USD", "type": "METAL"},
+                    {"name": "SPX500_USD", "type": "CFD"},
+                    {"name": "EUR_USD", "type": "CURRENCY"},
+                ]
+            },
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler), base_url="https://api-fxpractice.oanda.com") as client:
+        provider = OandaMarketDataProvider(api_token="token", account_id="abc", client=client)
+        symbols = await provider.get_symbols()
+
+    assert [symbol.symbol for symbol in symbols] == ["XAUUSD", "SP500", "EURUSD"]
+
+
+@pytest.mark.anyio
+async def test_oanda_get_symbols_returns_default_symbols_without_account_id() -> None:
+    provider = OandaMarketDataProvider(api_token="token")
+
+    symbols = await provider.get_symbols()
+
+    assert [symbol.symbol for symbol in symbols] == ["XAUUSD", "SP500", "US100"]
+
+
+@pytest.mark.anyio
+async def test_oanda_requires_api_token_for_http_requests() -> None:
+    provider = OandaMarketDataProvider(api_token="")
+
+    with pytest.raises(OandaConfigurationError):
+        await provider.get_historical_candles(
+            "XAUUSD",
+            "1m",
+            datetime(2024, 6, 19, 8, 0, tzinfo=UTC),
+            datetime(2024, 6, 19, 9, 0, tzinfo=UTC),
+        )
+
+
+@pytest.mark.anyio
+async def test_oanda_rejects_invalid_timeframe_before_request() -> None:
+    async with httpx.AsyncClient(transport=httpx.MockTransport(lambda _request: httpx.Response(500))) as client:
+        provider = OandaMarketDataProvider(api_token="token", client=client)
+        with pytest.raises(OandaValidationError):
+            await provider.get_historical_candles(
+                "XAUUSD",
+                "2m",
+                datetime(2024, 6, 19, 8, 0, tzinfo=UTC),
+                datetime(2024, 6, 19, 9, 0, tzinfo=UTC),
+            )
+
+
+@pytest.mark.anyio
+async def test_oanda_wraps_api_errors() -> None:
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(401, json={"errorMessage": "Insufficient authorization"})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler), base_url="https://api-fxpractice.oanda.com") as client:
+        provider = OandaMarketDataProvider(api_token="bad-token", client=client)
+        with pytest.raises(OandaAdapterError, match="Insufficient authorization"):
+            await provider.get_historical_candles(
+                "XAUUSD",
+                "1m",
+                datetime(2024, 6, 19, 8, 0, tzinfo=UTC),
+                datetime(2024, 6, 19, 9, 0, tzinfo=UTC),
+            )

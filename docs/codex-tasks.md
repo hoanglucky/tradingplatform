@@ -108,6 +108,142 @@ Pending verification:
 
 ## Next task candidate
 
+### 2026-06-18 - Day 6 database foundation
+
+Implemented:
+
+- Added SQLAlchemy async engine/session utilities.
+- Added shared SQLAlchemy declarative base.
+- Added Alembic configuration and async migration environment.
+- Added first empty migration.
+- Added Docker-backed migration commands.
+- Added database documentation.
+
+Verified:
+
+- `npm run db:upgrade`
+- `npm run db:current`
+- `npm run api-test`
+- Backend `/health` through Docker Compose
+
+### 2026-06-19 - Day 7 core database models
+
+Implemented:
+
+- Added SQLAlchemy models for users, symbols, candles, watchlists, and watchlist items.
+- Added Alembic migration `20260619_0002_core_tables`.
+- Added model metadata tests.
+- Updated database documentation.
+
+Verified:
+
+- `npm run lint:api`
+- `npm run db:upgrade`
+- `npm run db:current`
+- `npm run api-test`
+- PostgreSQL `\\dt` shows core tables.
+- PostgreSQL `\\di` shows candle index and unique constraints.
+- `npm run web-test`
+
+## Next task candidate
+
+### Day 13 - Market candles API
+
+Suggested scope:
+
+- Create `GET /market/candles`.
+- Accept `symbol`, `timeframe`, `start`, and `end` query params.
+- Use the Binance public adapter for now.
+- Return internal `Candle` schema responses.
+- Add mocked API tests.
+
+## Recently completed
+
+### Day 12 - Binance and Oanda market-data adapters
+
+Implemented:
+
+- Added `BinancePublicMarketDataProvider`.
+- Added `OandaMarketDataProvider`.
+- Added public `exchangeInfo`, `klines`, and `ticker/price` requests.
+- Added Oanda read-only candle requests using `OANDA_API_TOKEN`.
+- Converted Binance kline rows into internal `Candle` schemas.
+- Converted Oanda candle rows into internal `Candle` schemas.
+- Added validation for symbol, timeframe, and time range.
+- Added adapter error wrapping for Binance and Oanda API and HTTP errors.
+- Added mocked HTTP tests for both adapters.
+- Added `docs/market-data.md`.
+
+Verified:
+
+- `python3 -m compileall -q services/market-data/app services/market-data/tests`
+- `npm run market-data-test`
+
+### Day 11 - MarketDataProvider interface
+
+Implemented:
+
+- Added market-data `Candle`, `MarketSymbol`, and `LatestPrice` schemas.
+- Added `MarketDataProvider` protocol with `get_symbols`, `get_historical_candles`, and `get_latest_price`.
+- Added market-data schema validation tests.
+- Added `make market-data-test` and `npm run market-data-test`.
+- Updated shared TypeScript `Candle` type to use `timestamp`.
+
+Verified:
+
+- `python3 -m compileall -q services/market-data/app services/market-data/tests`
+- `npm run market-data-test`
+
+### Day 10 - Seed initial symbols
+
+Implemented:
+
+- Added idempotent default symbol seed logic.
+- Added CLI command `python -m app.cli.seed_symbols`.
+- Added `make seed` and `npm run seed`.
+- Added backend seed tests.
+- Seed data includes BTCUSDT, ETHUSDT, SOLUSDT, BNBUSDT, XRPUSDT, XAUUSD, SP500, and US100.
+
+Verified:
+
+- `python3 -m compileall -q apps/api/app apps/api/tests`
+- `npm run lint:api`
+- `npm run api-test`
+- `npm run seed`
+- `GET /symbols?active_only=true` returned the seeded symbols.
+
+### Day 9 - Symbol API
+
+Implemented:
+
+- Added Pydantic schemas for symbol create/update/read.
+- Added `/symbols` FastAPI routes for list, create, read, update, and delete.
+- Added duplicate symbol handling with `409 Conflict`.
+- Added OpenAPI coverage test for symbol paths.
+- Updated API test command to run with `APP_ENV=test` and avoid asyncpg event-loop reuse in pytest.
+
+Verified:
+
+- `python3 -m compileall -q apps/api/app apps/api/tests`
+- `npm run lint:api`
+- `npm run api-test`
+
+### Day 8 - Repository layer
+
+Implemented:
+
+- Added repositories for users, symbols, candles, watchlists, and watchlist items.
+- Added shared async CRUD behavior in `BaseRepository`.
+- Added symbol repository tests.
+- Updated backend test command to apply Alembic migrations before pytest.
+
+Verified:
+
+- `python3 -m compileall -q apps/api/app apps/api/tests`
+- `npm run lint:api`
+- `npm run api-test`
+- `npm run web-test`
+ 
 ### 2026-06-18 - Day 5 developer commands polish
 
 Implemented:

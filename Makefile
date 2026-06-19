@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: help setup dev up compose compose-services down logs ps web api api-test web-test test lint format clean
+.PHONY: help setup dev up compose compose-services down logs ps web api api-test market-data-test web-test test db-upgrade db-downgrade db-current db-revision seed lint format clean
 
 help:
 	@printf "Available commands:\n"
@@ -15,8 +15,12 @@ help:
 	@printf "  make web     Run the Next.js app locally\n"
 	@printf "  make api     Run the FastAPI app locally\n"
 	@printf "  make api-test Run backend tests in Docker\n"
+	@printf "  make market-data-test Run market-data service tests in Docker\n"
 	@printf "  make web-test Run frontend checks\n"
 	@printf "  make test    Run API and web checks\n"
+	@printf "  make db-upgrade Apply Alembic migrations\n"
+	@printf "  make db-current Show current Alembic revision\n"
+	@printf "  make seed    Seed default market symbols\n"
 	@printf "  make lint    Run available linters\n"
 	@printf "  make format  Format Python code with ruff if available\n"
 
@@ -52,14 +56,38 @@ api:
 	cd apps/api && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 api-test:
-	docker compose run --rm api pytest
+	@test -f .env || cp .env.example .env
+	docker compose build api
+	docker compose run --rm api sh -c "APP_ENV=test alembic upgrade head && APP_ENV=test pytest"
 
 web-test:
 	npm --workspace apps/web run lint
 	npm --workspace apps/web run typecheck
 	npm --workspace apps/web run build
 
-test: api-test web-test
+market-data-test:
+	@test -f .env || cp .env.example .env
+	docker compose --profile services build market-data
+	docker compose --profile services run --rm --no-deps market-data pytest
+
+test: api-test market-data-test web-test
+
+db-upgrade:
+	docker compose run --rm api alembic upgrade head
+
+db-downgrade:
+	docker compose run --rm api alembic downgrade -1
+
+db-current:
+	docker compose run --rm api alembic current
+
+db-revision:
+	docker compose run --rm api alembic revision --autogenerate -m "$(message)"
+
+seed:
+	@test -f .env || cp .env.example .env
+	docker compose build api
+	docker compose run --rm api sh -c "alembic upgrade head && python -m app.cli.seed_symbols"
 
 lint:
 	npm run lint

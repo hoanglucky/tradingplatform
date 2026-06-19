@@ -393,9 +393,18 @@ Requirements:
 
 **Done checklist:**
 
-* [ ] DB connection works
-* [ ] Alembic migration can run
-* [ ] Backend still starts
+* [x] Database connection utilities exist
+* [x] Async SQLAlchemy session management exists
+* [x] Shared declarative base model exists
+* [x] Alembic initialized
+* [x] First empty migration exists
+* [x] DB connection works
+* [x] Alembic migration can run
+* [x] Backend still starts
+
+**Implementation note - 2026-06-18:**
+
+Day 6 database foundation has been added with SQLAlchemy async engine/session utilities, Alembic configuration, and an initial empty migration. `npm run db:upgrade` and `npm run db:current` run successfully against PostgreSQL through Docker. The backend starts and returns `/health`.
 
 ---
 
@@ -422,9 +431,15 @@ Rules:
 
 **Done checklist:**
 
-* [ ] Migration created
-* [ ] Tables created
-* [ ] Indexes created
+* [x] Models created
+* [x] Migration created
+* [x] Tables created
+* [x] Indexes created
+* [x] Unique constraints created
+
+**Implementation note - 2026-06-19:**
+
+Core SQLAlchemy models and migration were added for users, symbols, candles, watchlists, and watchlist items. PostgreSQL verification shows the new tables plus `ix_candles_symbol_timeframe_timestamp`, `uq_candles_symbol_timeframe_timestamp`, and related unique constraints.
 
 ---
 
@@ -453,8 +468,8 @@ Add tests for symbol repository.
 
 **Done checklist:**
 
-* [ ] Repository layer exists
-* [ ] Symbol repository tests pass
+* [x] Repository layer exists
+* [x] Symbol repository tests pass
 
 ---
 
@@ -478,9 +493,9 @@ Add tests.
 
 **Done checklist:**
 
-* [ ] Symbol CRUD works
-* [ ] Tests pass
-* [ ] API docs show symbol endpoints
+* [x] Symbol CRUD works
+* [x] Tests pass
+* [x] API docs show symbol endpoints
 
 ---
 
@@ -497,6 +512,9 @@ Create seed script for initial symbols:
 - SOLUSDT
 - BNBUSDT
 - XRPUSDT
+- XAUUSD
+- SP500
+- US100
 
 Add Makefile command:
 - make seed
@@ -506,8 +524,8 @@ Update README.
 
 **Done checklist:**
 
-* [ ] Seed script works
-* [ ] Symbols visible in API
+* [x] Seed script works
+* [x] Symbols visible in API
 
 ---
 
@@ -540,13 +558,13 @@ Define Candle schema:
 
 **Done checklist:**
 
-* [ ] Interface created
-* [ ] Candle schema created
-* [ ] Tests for schema validation
+* [x] Interface created
+* [x] Candle schema created
+* [x] Tests for schema validation
 
 ---
 
-### Day 12 — Binance public adapter
+### Day 12 — Oanda, Binance public adapter
 
 **Goal:** Fetch public candle data.
 
@@ -568,9 +586,9 @@ No live trading.
 
 **Done checklist:**
 
-* [ ] Binance adapter works
-* [ ] Mock tests pass
-* [ ] No secret required
+* [x] Binance adapter works
+* [x] Mock tests pass
+* [x] No secret required
 
 ---
 
