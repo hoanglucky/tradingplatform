@@ -155,3 +155,15 @@ The seed command applies Alembic migrations first, then runs `python -m app.cli.
 ## Day 10 Scope
 
 Day 10 adds default symbol seed data, seed commands, and seed tests.
+
+## Candle Cache
+
+Day 14 connects the market-data service to PostgreSQL and uses the existing `symbols` and `candles` tables.
+
+Candles are upserted by:
+
+- `symbol_id`
+- `timeframe`
+- `timestamp`
+
+The `uq_candles_symbol_timeframe_timestamp` constraint guarantees deduplication. A repeated provider candle updates OHLCV values instead of creating a second row.

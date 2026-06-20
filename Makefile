@@ -67,8 +67,9 @@ web-test:
 
 market-data-test:
 	@test -f .env || cp .env.example .env
-	docker compose --profile services build market-data
-	docker compose --profile services run --rm --no-deps market-data pytest
+	docker compose --profile services build api market-data
+	docker compose run --rm api alembic upgrade head
+	docker compose --profile services run --rm market-data sh -c "APP_ENV=test pytest"
 
 test: api-test market-data-test web-test
 

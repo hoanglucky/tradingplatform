@@ -41,6 +41,8 @@ class OandaValidationError(ValueError):
 
 
 class OandaMarketDataProvider:
+    exchange = "oanda"
+
     def __init__(
         self,
         *,

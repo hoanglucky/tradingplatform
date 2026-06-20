@@ -29,20 +29,18 @@
 
 ## Current review task
 
-Review the Day 12 Binance and Oanda market-data adapters.
+Review the Day 14 candle storage task.
 
 Focus areas:
 
-- Confirm `BinancePublicMarketDataProvider` exists.
-- Confirm `OandaMarketDataProvider` exists.
-- Confirm it implements public symbol, historical kline, and latest price methods.
-- Confirm klines are converted into the internal `Candle` schema.
-- Confirm Oanda candles are converted into the internal `Candle` schema.
-- Confirm Oanda reads `OANDA_API_TOKEN`, `OANDA_ACCOUNT_ID`, and `OANDA_ENVIRONMENT`.
-- Confirm invalid timeframe and invalid time range are rejected before requests.
-- Confirm Binance and Oanda API errors are wrapped as adapter errors.
-- Confirm tests use mocked HTTP responses and do not call external APIs over the network.
-- Confirm no signed trading endpoint, order endpoint, or live trading behavior was added.
+- Confirm market-data connects to PostgreSQL through `DATABASE_URL`.
+- Confirm symbols are resolved from the `symbols` table.
+- Confirm cached ranges return without calling the provider.
+- Confirm incomplete ranges fetch provider data and store it.
+- Confirm upsert uses symbol, timeframe, and timestamp.
+- Confirm repeated candles update the existing row instead of creating duplicates.
+- Confirm PostgreSQL integration tests run after Alembic migrations.
+- Confirm unknown symbols return 404 and must be seeded first.
 - Confirm no live trading or exchange write behavior was added.
 
 ## Verification commands

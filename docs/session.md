@@ -654,3 +654,80 @@ Continue implementing Day 12.
 - Oanda token configuration was added only as empty environment variables.
 - No signed trading endpoints were added.
 - No account, private, order, live trading, or exchange write behavior was added.
+
+## 2026-06-20 - Day 13 Market Candles API
+
+### User request
+
+Implement Day 13 after reviewing how Oanda relates to Days 13 and 14.
+
+### Work completed
+
+- Added `GET /market/candles` to the market-data service.
+- Added query parameters:
+  - `symbol`
+  - `timeframe`
+  - `start`
+  - `end`
+- Added automatic provider routing:
+  - Oanda for `XAUUSD`, `SP500`, and `US100`
+  - Binance for other symbols
+- Added response validation through the internal `Candle` schema.
+- Added HTTP error mapping:
+  - `400` for provider validation errors
+  - `502` for upstream provider errors
+  - `503` when Oanda token configuration is missing
+- Added CORS configuration for the frontend origin.
+- Exposed the market-data service on port `8101`.
+- Added `NEXT_PUBLIC_MARKET_DATA_BASE_URL` to `.env.example`.
+- Added endpoint tests with mocked providers.
+- Updated `README.md`, `docs/market-data.md`, `docs/plan.md`, `docs/task.md`, and `docs/codex-tasks.md`.
+
+### Verification performed
+
+- `python3 -m compileall -q services/market-data/app services/market-data/tests` passed.
+- `npm run market-data-test` passed with 23 tests.
+- `npm test` passed across API, market-data, and web checks.
+- Market-data `/health` returned OK on port `8101`.
+- XAUUSD request returned `503` with a clear `OANDA_API_TOKEN` configuration message when the token was empty.
+
+### Safety notes
+
+- No order or trading endpoints were added.
+- Oanda remains read-only and requires an externally supplied token.
+- No live trading or exchange write behavior was added.
+
+## 2026-06-20 - Day 14 Candle Storage
+
+### User request
+
+Implement Day 14.
+
+### Work completed
+
+- Added async PostgreSQL engine/session support to the market-data service.
+- Added a SQLAlchemy Core candle repository using the existing `symbols` and `candles` tables.
+- Added symbol resolution with provider exchange preference.
+- Added candle range queries ordered by timestamp.
+- Added PostgreSQL upsert based on `symbol_id + timeframe + timestamp`.
+- Added `CandleStorageService` to:
+  - return complete cached ranges without calling the provider
+  - fetch provider data when cache coverage is incomplete
+  - deduplicate provider rows by timestamp before upsert
+  - return normalized candle rows from PostgreSQL
+- Updated `/market/candles` to use the storage service.
+- Added 404 handling for symbols that are not registered in the symbol catalog.
+- Updated market-data test commands to apply Alembic migrations before pytest.
+- Added unit tests for cache hits, partial cache fetches, deduplication, and unknown symbols.
+- Added a PostgreSQL integration test proving repeated upserts leave one candle row with updated values.
+- Updated `README.md`, `docs/database.md`, `docs/market-data.md`, `docs/plan.md`, `docs/task.md`, and `docs/codex-tasks.md`.
+
+### Verification performed
+
+- `python3 -m compileall -q services/market-data/app services/market-data/tests` passed.
+- `npm run market-data-test` passed with 28 tests.
+
+### Safety notes
+
+- Candle persistence is read-only market-data infrastructure.
+- No order, live trading, or exchange write behavior was added.

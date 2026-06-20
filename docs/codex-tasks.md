@@ -147,17 +147,47 @@ Verified:
 
 ## Next task candidate
 
-### Day 13 - Market candles API
+### Day 15 - Market data docs
 
 Suggested scope:
 
-- Create `GET /market/candles`.
-- Accept `symbol`, `timeframe`, `start`, and `end` query params.
-- Use the Binance public adapter for now.
-- Return internal `Candle` schema responses.
-- Add mocked API tests.
+- Update architecture and API documentation for the full market-data flow.
+- Document provider selection, normalization, caching, errors, and environment configuration.
+- Add example Binance and Oanda requests.
 
 ## Recently completed
+
+### Day 14 - Candle storage
+
+Implemented:
+
+- Added PostgreSQL session support to the market-data service.
+- Added candle repository queries and PostgreSQL upsert.
+- Added `CandleStorageService` for cache/provider orchestration.
+- Updated `/market/candles` to return cache data and persist provider results.
+- Added cache, deduplication, unknown-symbol, and PostgreSQL integration tests.
+- Updated market-data tests to apply Alembic migrations first.
+
+Verified:
+
+- `python3 -m compileall -q services/market-data/app services/market-data/tests`
+- `npm run market-data-test`
+
+### Day 13 - Market candles API
+
+Implemented:
+
+- Added `GET /market/candles` to the market-data service.
+- Added symbol, timeframe, start, and end query parameters.
+- Added provider routing for Binance and Oanda.
+- Added clean HTTP error mapping for validation, configuration, and upstream failures.
+- Exposed the market-data service on port `8101`.
+- Added mocked endpoint tests.
+
+Verified:
+
+- `python3 -m compileall -q services/market-data/app services/market-data/tests`
+- `npm run market-data-test`
 
 ### Day 12 - Binance and Oanda market-data adapters
 

@@ -94,7 +94,11 @@ services:
       context: ./services/market-data
     env_file:
       - .env
+    ports:
+      - "8101:8101"
     depends_on:
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_healthy
 

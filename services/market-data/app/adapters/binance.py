@@ -38,6 +38,8 @@ class BinanceValidationError(ValueError):
 
 
 class BinancePublicMarketDataProvider:
+    exchange = "binance"
+
     def __init__(
         self,
         *,

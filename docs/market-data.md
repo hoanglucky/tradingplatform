@@ -85,3 +85,62 @@ npm run market-data-test
 ```
 
 The Binance and Oanda adapter tests use mocked HTTP responses and do not call external APIs over the network.
+
+## Market Candles API
+
+Day 13 adds:
+
+```txt
+GET /market/candles
+```
+
+Query parameters:
+
+- `symbol`
+- `timeframe`
+- `start`
+- `end`
+
+Example:
+
+```bash
+curl "http://localhost:8101/market/candles?symbol=BTCUSDT&timeframe=1m&start=2024-06-19T08:00:00Z&end=2024-06-19T09:00:00Z"
+```
+
+Provider routing:
+
+- `XAUUSD`, `SP500`, and `US100` use Oanda.
+- Other symbols currently use Binance.
+
+Oanda requests return `503` when `OANDA_API_TOKEN` is not configured. Provider validation errors return `400`, while upstream provider failures return `502`.
+
+Start the market-data service locally:
+
+```bash
+docker compose --profile services up --build market-data
+```
+
+The service is exposed at `http://localhost:8101`.
+
+## Candle Storage
+
+Day 14 adds PostgreSQL candle caching behind `GET /market/candles`.
+
+Flow:
+
+1. Resolve the requested symbol from the `symbols` table.
+2. Read cached candles for symbol, timeframe, and requested range.
+3. Return the cached rows without calling a provider when the range is covered.
+4. Fetch the requested range from Binance or Oanda when cache coverage is incomplete.
+5. Upsert provider candles using `symbol_id + timeframe + timestamp`.
+6. Return the normalized rows from PostgreSQL.
+
+The database unique constraint prevents duplicate candles. Existing candle values are updated when a provider returns a corrected candle for the same timestamp.
+
+Run migrations and market-data tests:
+
+```bash
+npm run market-data-test
+```
+
+This command now builds the API and market-data images, applies Alembic migrations, and runs both unit and PostgreSQL integration tests for market data.

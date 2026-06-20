@@ -40,6 +40,8 @@ The local stack exposes:
 - Web app: <http://localhost:2000>
 - API: <http://localhost:8000>
 - API docs: <http://localhost:8000/docs>
+- Market data: <http://localhost:8101>
+- Market data docs: <http://localhost:8101/docs>
 - PostgreSQL: `localhost:5432`
 - Redis: `localhost:6379`
 
@@ -167,6 +169,10 @@ Day 12 adds read-only market-data adapters:
 - Oanda read-only adapter for instrument candles. Configure `OANDA_API_TOKEN` in `.env` to fetch Oanda data directly.
 
 These adapters do not place, modify, or close orders.
+
+Day 13 exposes `GET /market/candles` from the market-data service on port `8101`. It routes `XAUUSD`, `SP500`, and `US100` to Oanda and uses Binance for other symbols.
+
+Day 14 adds PostgreSQL candle caching. Fully covered ranges are returned from the database; incomplete ranges are fetched from the selected provider and upserted without duplicate timestamps.
 
 See [docs/market-data.md](docs/market-data.md) for market-data service details.
 

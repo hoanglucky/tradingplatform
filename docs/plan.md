@@ -615,9 +615,9 @@ Add tests.
 
 **Done checklist:**
 
-* [ ] `/market/candles` works
-* [ ] Test with BTCUSDT works
-* [ ] Errors handled cleanly
+* [x] `/market/candles` works
+* [x] Test with BTCUSDT works
+* [x] Errors handled cleanly
 
 ---
 
@@ -641,9 +641,9 @@ Add tests for deduplication.
 
 **Done checklist:**
 
-* [ ] Candles stored in DB
-* [ ] No duplicate candles
-* [ ] Tests pass
+* [x] Candles stored in DB
+* [x] No duplicate candles
+* [x] Tests pass
 
 ---
 
