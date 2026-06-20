@@ -731,3 +731,110 @@ Implement Day 14.
 
 - Candle persistence is read-only market-data infrastructure.
 - No order, live trading, or exchange write behavior was added.
+
+## 2026-06-20 - Day 15 Market Data Documentation
+
+### User request
+
+Implement Day 15.
+
+### Work completed
+
+- Updated `docs/architecture.md` with:
+  - current implementation status
+  - complete market-data request flow
+  - `MarketDataProvider` contract
+  - Binance and Oanda provider behavior
+  - internal Candle contract
+  - PostgreSQL cache and deduplication design
+  - Oanda credential safety guidance
+- Updated `docs/api.md` with:
+  - market-data service base URL
+  - `/market/candles` query parameters
+  - Binance and Oanda examples
+  - normalized response example
+  - provider routing
+  - cache behavior
+  - HTTP error behavior
+  - environment configuration
+- Updated `docs/plan.md`, `docs/task.md`, and `docs/codex-tasks.md`.
+
+### Verification performed
+
+- `python3 -m compileall -q services/market-data/app services/market-data/tests` passed.
+- `npm run web-test` passed frontend lint, typecheck, and production build.
+- Required market-data architecture and API documentation sections were verified with `rg`.
+- `npm test` was attempted but Docker Desktop/WSL integration was unavailable at that moment. Earlier in the same work session, `npm run market-data-test` passed with 28 tests, including the PostgreSQL upsert integration test.
+
+### Safety notes
+
+- Documentation preserves read-only provider boundaries.
+- No live trading or exchange write behavior was added.
+
+## 2026-06-20 - Day 16 Chart Library Setup
+
+### User request
+
+Implement Day 16.
+
+### Work completed
+
+- Installed TradingView Lightweight Charts 5.2.0 in the web workspace.
+- Added `/dashboard/chart`.
+- Added Chart navigation to the application sidebar.
+- Added a client-side mock candlestick renderer using `createChart` and `CandlestickSeries`.
+- Added sixteen mock BTCUSDT hourly candles.
+- Added responsive chart resizing and cleanup on unmount.
+- Added an operational chart toolbar with mock symbol, timeframe, last price, and change.
+- Added stable desktop/mobile chart dimensions.
+- Added visible TradingView attribution.
+- Kept the page disconnected from market-data APIs as required by Day 16.
+- Updated `README.md`, `docs/plan.md`, `docs/task.md`, and `docs/codex-tasks.md`.
+
+### Verification performed
+
+- `npm run web-test` passed lint, typecheck, and production build.
+- Next.js build included `/dashboard/chart` as a static route.
+- `GET /dashboard/chart` returned HTTP 200 from the local dev server.
+- Server HTML included BTCUSDT, mock data status, and TradingView attribution.
+- Chromium/Playwright was not available in the environment for an automated canvas screenshot.
+
+### Safety notes
+
+- Mock chart data is local and does not call Binance or Oanda.
+- No live trading or exchange write behavior was added.
+
+## 2026-06-20 - Day 17 Reusable CandlestickChart
+
+### User request
+
+Implement Day 17.
+
+### Work completed
+
+- Replaced `MockCandlestickChart` with reusable `CandlestickChart`.
+- Added required props:
+  - `candles`
+  - `symbol`
+  - `timeframe`
+  - `height`
+  - `loading`
+  - `error`
+- Added ISO timestamp conversion and chronological sorting.
+- Added loading state with reduced-motion support.
+- Added explicit error and empty-data states.
+- Preserved stable dimensions for every component state.
+- Preserved ResizeObserver-based width updates.
+- Preserved chart and observer cleanup on state changes and unmount.
+- Moved mock candles to `/dashboard/chart` and passed them through props.
+- Updated `README.md`, `docs/plan.md`, `docs/task.md`, and `docs/codex-tasks.md`.
+
+### Verification performed
+
+- `npm run web-test` passed lint, typecheck, and production build.
+- Next.js build included `/dashboard/chart`.
+
+### Safety notes
+
+- Chart data remains local mock data.
+- No live trading or exchange write behavior was added.

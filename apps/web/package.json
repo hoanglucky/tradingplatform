@@ -12,6 +12,7 @@
   "dependencies": {
     "@trading-framework/shared": "0.1.0",
     "@trading-framework/ui": "0.1.0",
+    "lightweight-charts": "^5.2.0",
     "next": "16.2.9",
     "react": "19.2.7",
     "react-dom": "19.2.7"

@@ -29,18 +29,17 @@
 
 ## Current review task
 
-Review the Day 14 candle storage task.
+Review the Day 17 reusable CandlestickChart component.
 
 Focus areas:
 
-- Confirm market-data connects to PostgreSQL through `DATABASE_URL`.
-- Confirm symbols are resolved from the `symbols` table.
-- Confirm cached ranges return without calling the provider.
-- Confirm incomplete ranges fetch provider data and store it.
-- Confirm upsert uses symbol, timeframe, and timestamp.
-- Confirm repeated candles update the existing row instead of creating duplicates.
-- Confirm PostgreSQL integration tests run after Alembic migrations.
-- Confirm unknown symbols return 404 and must be seeded first.
+- Confirm `CandlestickChart` accepts candles, symbol, timeframe, height, loading, and error props.
+- Confirm ISO candle timestamps are converted and sorted for Lightweight Charts.
+- Confirm loading, error, and empty states preserve stable height.
+- Confirm ResizeObserver updates chart width.
+- Confirm chart and observer cleanup run on effect cleanup.
+- Confirm `/dashboard/chart` uses the reusable component with mock data.
+- Confirm the chart still does not call the market-data API.
 - Confirm no live trading or exchange write behavior was added.
 
 ## Verification commands

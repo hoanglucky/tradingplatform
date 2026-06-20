@@ -147,15 +147,62 @@ Verified:
 
 ## Next task candidate
 
-### Day 15 - Market data docs
+### Day 18 - Symbol and timeframe selector
 
 Suggested scope:
 
-- Update architecture and API documentation for the full market-data flow.
-- Document provider selection, normalization, caching, errors, and environment configuration.
-- Add example Binance and Oanda requests.
+- Add symbol and timeframe controls to the chart workspace.
+- Default to BTCUSDT and 15m.
+- Keep selection state client-side without connecting the API yet.
 
 ## Recently completed
+
+### Day 17 - CandlestickChart component
+
+Implemented:
+
+- Added reusable `CandlestickChart` component.
+- Added candles, symbol, timeframe, height, loading, and error props.
+- Added sorted ISO timestamp conversion for Lightweight Charts.
+- Added loading, error, and empty states.
+- Preserved auto resize and cleanup behavior.
+- Moved mock candle data into the chart page.
+
+Verified:
+
+- `npm run web-test`
+- Next.js build included `/dashboard/chart`.
+
+### Day 16 - Install chart library
+
+Implemented:
+
+- Installed `lightweight-charts` 5.2.0 in `apps/web`.
+- Added `/dashboard/chart` and sidebar navigation.
+- Added a stable responsive chart workspace.
+- Rendered mock BTCUSDT candlesticks with no API connection.
+- Added TradingView attribution.
+
+Verified:
+
+- `npm run web-test`
+- `GET /dashboard/chart` returned HTTP 200.
+- Server HTML included BTCUSDT, mock status, and TradingView attribution.
+
+### Day 15 - Market data docs
+
+Implemented:
+
+- Documented the complete provider, normalization, cache, and response flow.
+- Documented Binance and Oanda selection and configuration.
+- Documented the internal Candle schema.
+- Documented `/market/candles` requests, responses, errors, and examples.
+- Documented PostgreSQL upsert and deduplication behavior.
+
+Verified:
+
+- `docs/architecture.md` updated.
+- `docs/api.md` updated.
 
 ### Day 14 - Candle storage
 

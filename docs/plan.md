@@ -666,8 +666,8 @@ Document:
 
 **Done checklist:**
 
-* [ ] Docs updated
-* [ ] API behavior explained
+* [x] Docs updated
+* [x] API behavior explained
 
 ---
 
@@ -692,8 +692,8 @@ Do not connect API yet.
 
 **Done checklist:**
 
-* [ ] Chart page exists
-* [ ] Mock candles render
+* [x] Chart page exists
+* [x] Mock candles render
 
 ---
 
@@ -723,9 +723,9 @@ Requirements:
 
 **Done checklist:**
 
-* [ ] Component reusable
-* [ ] Empty state works
-* [ ] Resize works
+* [x] Component reusable
+* [x] Empty state works
+* [x] Resize works
 
 ---
 

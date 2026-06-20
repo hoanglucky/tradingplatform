@@ -38,6 +38,7 @@ make dev
 The local stack exposes:
 
 - Web app: <http://localhost:2000>
+- Mock chart: <http://localhost:2000/dashboard/chart>
 - API: <http://localhost:8000>
 - API docs: <http://localhost:8000/docs>
 - Market data: <http://localhost:8101>
@@ -175,6 +176,10 @@ Day 13 exposes `GET /market/candles` from the market-data service on port `8101`
 Day 14 adds PostgreSQL candle caching. Fully covered ranges are returned from the database; incomplete ranges are fetched from the selected provider and upserted without duplicate timestamps.
 
 See [docs/market-data.md](docs/market-data.md) for market-data service details.
+
+## Chart Workspace
+
+The chart workspace is available at `/dashboard/chart`. It uses a reusable `CandlestickChart` component with candles, symbol, timeframe, height, loading, and error props. Day 17 still uses local mock BTCUSDT candles and does not call the market-data API yet.
 
 ## Next Milestones
 

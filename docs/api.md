@@ -6,6 +6,12 @@ Base URL in local development:
 http://localhost:8000
 ```
 
+Market-data service base URL:
+
+```txt
+http://localhost:8101
+```
+
 ## Status endpoints
 
 ### `GET /`
@@ -184,6 +190,81 @@ Returns `404` when the symbol does not exist and `409` when the update would dup
 ### `DELETE /symbols/{symbol_id}`
 
 Deletes a symbol. Returns `204` on success or `404` when the symbol does not exist.
+
+## Market Data Endpoints
+
+Market-data endpoints are served by `services/market-data` on port `8101`.
+
+### `GET /market/candles`
+
+Returns normalized candles for a symbol and time range.
+
+Required query parameters:
+
+- `symbol`: internal symbol such as `BTCUSDT` or `XAUUSD`
+- `timeframe`: provider-supported timeframe such as `1m`, `5m`, `1h`, or `1d`
+- `start`: timezone-aware ISO 8601 datetime
+- `end`: timezone-aware ISO 8601 datetime
+
+Binance example:
+
+```bash
+curl "http://localhost:8101/market/candles?symbol=BTCUSDT&timeframe=1m&start=2024-06-19T08:00:00Z&end=2024-06-19T09:00:00Z"
+```
+
+Oanda example:
+
+```bash
+curl "http://localhost:8101/market/candles?symbol=XAUUSD&timeframe=5m&start=2024-06-19T08:00:00Z&end=2024-06-19T09:00:00Z"
+```
+
+Example response:
+
+```json
+[
+  {
+    "symbol": "BTCUSDT",
+    "timeframe": "1m",
+    "timestamp": "2024-06-19T08:00:00Z",
+    "open": "65000.10000000",
+    "high": "65100.25000000",
+    "low": "64950.00000000",
+    "close": "65050.50000000",
+    "volume": "123.45600000"
+  }
+]
+```
+
+Provider selection:
+
+- `XAUUSD`, `SP500`, and `US100` use Oanda.
+- Other registered symbols currently use Binance.
+
+Cache behavior:
+
+- A fully covered range is returned from PostgreSQL without an external provider request.
+- An incomplete range is fetched from the selected provider and upserted into PostgreSQL.
+- Duplicate provider rows are collapsed by timestamp before upsert.
+- PostgreSQL guarantees uniqueness by symbol, timeframe, and timestamp.
+
+Error responses:
+
+- `400`: unsupported timeframe, invalid range, or provider validation error
+- `404`: symbol is not registered in the symbol catalog
+- `422`: required query parameter is missing or malformed
+- `502`: Binance or Oanda upstream request failed
+- `503`: required provider configuration, such as `OANDA_API_TOKEN`, is missing
+
+### Market-data configuration
+
+```env
+DATABASE_URL=postgresql+asyncpg://trader:trader@postgres:5432/trading_framework
+OANDA_API_TOKEN=
+OANDA_ACCOUNT_ID=
+OANDA_ENVIRONMENT=practice
+```
+
+Binance public candle requests require no API key. Oanda credentials must remain outside version control. No market-data endpoint places or modifies orders.
 
 ## Day 2 implementation notes
 

@@ -6,6 +6,7 @@ import type { HealthStatus, ReadinessStatus, SafetyStatus } from "@trading-frame
 const navItems = [
   { href: "/", label: "Dashboard" },
   { href: "/markets", label: "Markets" },
+  { href: "/dashboard/chart", label: "Chart" },
   { href: "/strategies", label: "Strategies" },
   { href: "/backtests", label: "Backtests" },
   { href: "/paper", label: "Paper" },
@@ -80,4 +81,3 @@ export function AppShell({
     </div>
   );
 }
-
