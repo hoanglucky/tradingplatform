@@ -755,9 +755,9 @@ Supported timeframes:
 
 **Done checklist:**
 
-* [ ] Symbol selector works
-* [ ] Timeframe selector works
-* [ ] State updates correctly
+* [x] Symbol selector works
+* [x] Timeframe selector works
+* [x] State updates correctly
 
 ---
 
@@ -779,9 +779,9 @@ Requirements:
 
 **Done checklist:**
 
-* [ ] Chart shows backend candles
-* [ ] Loading state works
-* [ ] Error state works
+* [x] Chart shows backend candles
+* [x] Loading state works
+* [x] Error state works
 
 ---
 
@@ -804,9 +804,13 @@ Add:
 
 **Done checklist:**
 
-* [ ] Chart page usable
-* [ ] Latest price visible
-* [ ] Refresh works
+* [x] Chart page usable
+* [x] Latest price visible
+* [x] Refresh works
+
+**Implementation note - 2026-06-23:**
+
+The chart workspace now has a responsive market header, a clearly labeled latest close and period change, a manual refresh action, live/loading/error feedback, and a last-updated timestamp. Refresh requests use the existing read-only candle endpoint and retain the current chart while new data is loading.
 
 ---
 
@@ -836,9 +840,13 @@ For now, send mock candle updates every few seconds.
 
 **Done checklist:**
 
-* [ ] WebSocket connects
-* [ ] Subscribe message works
-* [ ] Mock updates received
+* [x] WebSocket connects
+* [x] Subscribe message works
+* [x] Mock updates received
+
+**Implementation note - 2026-06-23:**
+
+The FastAPI app now exposes `/ws/market`. Clients can subscribe or resubscribe with a validated symbol and timeframe, receive an acknowledgement, and then receive normalized mock OHLCV candles every `MARKET_WS_INTERVAL_SECONDS`. Invalid messages return a structured error while keeping the connection available for another subscription.
 
 ---
 
@@ -860,9 +868,13 @@ Requirements:
 
 **Done checklist:**
 
-* [ ] Realtime candles received
-* [ ] Normalized format used
-* [ ] Disconnect handled
+* [x] Realtime candles received
+* [x] Normalized format used
+* [x] Disconnect handled
+
+**Implementation note - 2026-06-23:**
+
+`MarketStreamHub` now opens one Binance public kline stream per active symbol/timeframe and broadcasts normalized candles to every matching frontend subscription. It removes upstream tasks after the final client disconnects, reports transient outages, and reconnects with bounded exponential backoff. Slow-client queues are bounded and retain the newest updates.
 
 ---
 

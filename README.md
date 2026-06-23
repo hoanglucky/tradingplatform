@@ -151,8 +151,11 @@ Current core endpoints:
 - `POST /symbols`
 - `PATCH /symbols/{symbol_id}`
 - `DELETE /symbols/{symbol_id}`
+- `WS /ws/market`
 
 See [docs/api.md](docs/api.md) for request and response details.
+
+The market WebSocket accepts symbol/timeframe subscriptions and broadcasts normalized candles from Binance's public market-data-only kline stream. It shares one upstream connection per active symbol/timeframe and reconnects automatically after transient disconnects. No API key is required.
 
 ## Market Data Contracts
 
@@ -179,12 +182,12 @@ See [docs/market-data.md](docs/market-data.md) for market-data service details.
 
 ## Chart Workspace
 
-The chart workspace is available at `/dashboard/chart`. It uses a reusable `CandlestickChart` component with candles, symbol, timeframe, height, loading, and error props. Day 17 still uses local mock BTCUSDT candles and does not call the market-data API yet.
+The chart workspace is available at `/dashboard/chart`. It uses a reusable `CandlestickChart` component and fetches read-only candles from `GET /market/candles` whenever the selected symbol or timeframe changes. API Decimal values are normalized to numbers before rendering. The responsive market header shows the latest close and update status, and its refresh button reloads the current selection without changing chart settings.
 
 ## Next Milestones
 
-1. Add the Market Candles API endpoint.
-2. Add durable event contracts between services.
-3. Implement additional read-only exchange market data adapters.
+1. Connect the chart workspace to realtime candle updates.
+2. Add an Oanda-compatible realtime path for non-Binance symbols.
+3. Add durable event contracts between services.
 4. Build paper order lifecycle and portfolio accounting.
 5. Add backtest result persistence and report views.

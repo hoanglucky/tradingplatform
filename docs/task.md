@@ -29,17 +29,18 @@
 
 ## Current review task
 
-Review the Day 17 reusable CandlestickChart component.
+Review the Day 22 realtime market stream service.
 
 Focus areas:
 
-- Confirm `CandlestickChart` accepts candles, symbol, timeframe, height, loading, and error props.
-- Confirm ISO candle timestamps are converted and sorted for Lightweight Charts.
-- Confirm loading, error, and empty states preserve stable height.
-- Confirm ResizeObserver updates chart width.
-- Confirm chart and observer cleanup run on effect cleanup.
-- Confirm `/dashboard/chart` uses the reusable component with mock data.
-- Confirm the chart still does not call the market-data API.
+- Confirm the source connects only to Binance's public market-data WebSocket.
+- Confirm Binance kline payloads normalize into validated OHLCV candle messages.
+- Confirm clients with the same symbol/timeframe share one upstream stream.
+- Confirm normalized updates broadcast to every matching client queue.
+- Confirm slow-client queues remain bounded and retain recent updates.
+- Confirm transient disconnects emit a reconnecting event and use bounded backoff.
+- Confirm the final unsubscribe cancels the upstream stream task.
+- Confirm resubscribe and client disconnect cleanup release old subscriptions.
 - Confirm no live trading or exchange write behavior was added.
 
 ## Verification commands

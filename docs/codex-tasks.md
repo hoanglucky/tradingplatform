@@ -147,15 +147,95 @@ Verified:
 
 ## Next task candidate
 
-### Day 18 - Symbol and timeframe selector
+### Day 23 - Frontend WebSocket subscription
 
 Suggested scope:
 
-- Add symbol and timeframe controls to the chart workspace.
-- Default to BTCUSDT and 15m.
-- Keep selection state client-side without connecting the API yet.
+- Connect the chart workspace to `/ws/market`.
+- Subscribe whenever the selected symbol or timeframe changes.
+- Update or append realtime candles and clean up sockets on unmount.
 
 ## Recently completed
+
+### Day 22 - Real market stream service
+
+Implemented:
+
+- Added a read-only Binance public kline WebSocket source.
+- Added strict Binance payload normalization into the internal candle schema.
+- Added one shared upstream task per active symbol/timeframe.
+- Added bounded per-client queues and broadcast fan-out.
+- Added disconnect cleanup, reconnect status events, and exponential backoff.
+- Replaced Day 21 mock events with `source=binance`, `mock=false` updates.
+
+Verified:
+
+- `npm run lint:api`
+- `npm run api-test` with 20 passing tests.
+- Live Docker WebSocket smoke test received a real BTCUSDT candle from Binance.
+
+### Day 21 - Backend WebSocket endpoint
+
+Implemented:
+
+- Added `WS /ws/market` to the FastAPI router.
+- Added validated subscribe, acknowledgement, candle, and error schemas.
+- Added uppercase symbol normalization and six supported timeframes.
+- Added configurable periodic mock OHLCV updates.
+- Supported resubscription and invalid-message recovery on an open connection.
+
+Verified:
+
+- `npm run lint:api`
+- `npm run api-test` with 14 passing tests.
+- Live Docker WebSocket handshake returned an acknowledgement and mock candle.
+
+### Day 20 - Chart UI polish
+
+Implemented:
+
+- Added a manual candle refresh action with disabled and loading states.
+- Added latest-close, period-change, live-status, and last-updated feedback.
+- Kept current candles visible while a manual refresh is in progress.
+- Improved chart controls for tablet and mobile widths.
+- Added a Lucide refresh icon with accessible label and tooltip.
+
+Verified:
+
+- `npm run web-test`
+- Production build includes `/dashboard/chart`.
+
+### Day 19 - Connect chart to backend
+
+Implemented:
+
+- Connected `ChartWorkspace` to `GET /market/candles`.
+- Refetched data when symbol or timeframe changes.
+- Added 120-bar timeframe-aligned request ranges.
+- Added AbortController cleanup for stale requests.
+- Added API candle validation and numeric normalization.
+- Connected loading, error, candles, latest close, and percentage change to backend state.
+
+Verified:
+
+- `npm run web-test`
+- Market-data BTCUSDT 15m request returned HTTP 200 with real candles.
+
+### Day 18 - Symbol and timeframe selectors
+
+Implemented:
+
+- Added client-side `ChartWorkspace` state.
+- Added symbol selector with Binance and Oanda mock markets.
+- Added segmented timeframe selector for 1m, 5m, 15m, 1h, 4h, and 1d.
+- Defaulted to BTCUSDT and 15m.
+- Regenerated mock candles, latest price, percentage change, and headings when state changes.
+
+Verified:
+
+- `npm run web-test`
+- `GET /dashboard/chart` returned HTTP 200.
+- Initial HTML contained BTCUSDT, 15m, and symbol options.
 
 ### Day 17 - CandlestickChart component
 

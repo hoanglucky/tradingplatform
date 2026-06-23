@@ -114,6 +114,69 @@ Rules:
 - `exchange_writes_allowed` must remain `false` in the MVP.
 - Exchange adapters are read-only unless a later task explicitly changes the architecture and safety model.
 
+## Market WebSocket
+
+### `WS /ws/market`
+
+Connect to `ws://localhost:8000/ws/market`, then send a subscription:
+
+```json
+{
+  "type": "subscribe",
+  "symbol": "BTCUSDT",
+  "timeframe": "1m"
+}
+```
+
+Supported timeframes are `1m`, `5m`, `15m`, `1h`, `4h`, and `1d`. Symbols are normalized to uppercase.
+
+The server first acknowledges the active subscription:
+
+```json
+{
+  "type": "subscribed",
+  "symbol": "BTCUSDT",
+  "timeframe": "1m",
+  "source": "binance",
+  "mock": false
+}
+```
+
+It then broadcasts normalized updates from Binance's public kline stream:
+
+```json
+{
+  "type": "candle",
+  "symbol": "BTCUSDT",
+  "timeframe": "1m",
+  "timestamp": "2026-06-23T08:43:00Z",
+  "open": 62418.39,
+  "high": 62440.01,
+  "low": 62405.88,
+  "close": 62440.0,
+  "volume": 40.90346,
+  "closed": false,
+  "source": "binance",
+  "mock": false
+}
+```
+
+Clients may send another valid subscribe message on the same connection. Invalid subscriptions receive an `invalid_subscription` error and can be retried without reconnecting.
+
+The API shares one upstream Binance connection between clients using the same symbol/timeframe. If Binance disconnects, clients receive a `market_stream_reconnecting` error event while the hub retries with bounded exponential backoff. The queue for each client is bounded; when a client cannot keep up, the oldest pending update is replaced by newer market data.
+
+Current realtime support is for Binance-listed symbols. Oanda-only symbols remain available through the historical candle HTTP endpoint and require a future realtime adapter.
+
+Configuration:
+
+```env
+BINANCE_WS_BASE_URL=wss://data-stream.binance.vision/ws
+MARKET_STREAM_RECONNECT_SECONDS=1
+MARKET_STREAM_MAX_RECONNECT_SECONDS=30
+```
+
+The Binance stream is public and read-only. No API key, account access, order action, or exchange write operation is used.
+
 ## Module endpoints
 
 ### `GET /modules`

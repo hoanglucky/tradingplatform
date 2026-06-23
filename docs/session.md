@@ -838,3 +838,175 @@ Implement Day 17.
 
 - Chart data remains local mock data.
 - No live trading or exchange write behavior was added.
+
+## 2026-06-23 - Day 18 Symbol and Timeframe Selectors
+
+### User request
+
+Implement Day 18.
+
+### Work completed
+
+- Added client-side `ChartWorkspace` component.
+- Added native symbol selector with:
+  - BTCUSDT
+  - ETHUSDT
+  - SOLUSDT
+  - XAUUSD
+  - SP500
+  - US100
+- Added segmented timeframe selector with:
+  - 1m
+  - 5m
+  - 15m
+  - 1h
+  - 4h
+  - 1d
+- Set defaults to BTCUSDT and 15m.
+- Added selected and focus-visible control states.
+- Added deterministic mock candle generation per symbol and timeframe.
+- Updated chart title, provider label, latest price, and percentage change from selection state.
+- Kept selectors disconnected from market-data APIs for Day 18.
+- Updated `README.md`, `docs/plan.md`, `docs/task.md`, and `docs/codex-tasks.md`.
+
+### Verification performed
+
+- `npm run web-test` passed lint, typecheck, and production build.
+- Next.js build included `/dashboard/chart`.
+- `GET /dashboard/chart` returned HTTP 200.
+- Initial page HTML contained BTCUSDT, 15m, and Binance/Oanda symbol options.
+
+### Safety notes
+
+- Selection changes only local mock chart data.
+- No live trading or exchange write behavior was added.
+
+## 2026-06-23 - Day 19 Connect Chart to Backend
+
+### User request
+
+Implement Day 19.
+
+### Work completed
+
+- Removed the client-side mock candle generator from `ChartWorkspace`.
+- Connected the chart to `NEXT_PUBLIC_MARKET_DATA_BASE_URL/market/candles`.
+- Added automatic fetches when symbol or timeframe changes.
+- Added 120-bar lookback ranges aligned to timeframe boundaries.
+- Added AbortController cleanup to prevent stale requests from updating state.
+- Added API response validation.
+- Converted API Decimal strings into numeric OHLCV values.
+- Connected backend data to the reusable `CandlestickChart`.
+- Connected latest close and percentage change to fetched candles.
+- Added live/loading/unavailable status feedback.
+- Passed backend errors into the chart error state.
+- Updated `README.md`, `docs/plan.md`, `docs/task.md`, and `docs/codex-tasks.md`.
+
+### Verification performed
+
+- `npm run web-test` passed lint, typecheck, and production build.
+- Next.js build included `/dashboard/chart`.
+- PostgreSQL, Redis, and market-data services started successfully through Docker Compose.
+- Default symbols were migrated and seeded.
+- A live BTCUSDT 15m request returned HTTP 200 with normalized Binance candles.
+
+### Safety notes
+
+- The chart only requests read-only market data.
+- No order, live trading, or exchange write behavior was added.
+
+## 2026-06-23 - Day 20 Chart UI Polish
+
+### User request
+
+Implement Day 20.
+
+### Work completed
+
+- Refined the chart toolbar into a responsive market header.
+- Kept symbol/provider identification and the read-only exchange label visible.
+- Added a clearly labeled latest-close value and period percentage change.
+- Added an accessible manual refresh button using a Lucide icon.
+- Disabled refresh while a request is active and added reduced-motion-aware spinner feedback.
+- Added loading, refreshing, live, and unavailable states.
+- Added the last successful update time.
+- Preserved existing candles on screen while a manual refresh runs.
+- Reset stale chart values immediately when symbol or timeframe changes.
+- Improved tablet and mobile control layout.
+- Updated `README.md`, `docs/plan.md`, `docs/task.md`, and `docs/codex-tasks.md`.
+
+### Verification performed
+
+- `npm run web-test` passed lint, typecheck, and production build.
+- Next.js production build included `/dashboard/chart`.
+- `GET http://localhost:2000/dashboard/chart` returned HTTP 200.
+- `GET http://localhost:8101/health` returned HTTP 200.
+
+### Safety notes
+
+- Refresh only repeats a read-only `GET /market/candles` request.
+- No order, live trading, or exchange write behavior was added.
+
+## 2026-06-23 - Day 21 Backend WebSocket Endpoint
+
+### User request
+
+Implement Day 21.
+
+### Work completed
+
+- Added FastAPI endpoint `WS /ws/market`.
+- Added Pydantic contracts for subscriptions, acknowledgements, candles, and errors.
+- Added symbol normalization and validation for the six chart timeframes.
+- Added periodic mock OHLCV updates aligned to timeframe boundaries.
+- Added `MARKET_WS_INTERVAL_SECONDS` configuration with a three-second default.
+- Supported resubscription on an existing WebSocket connection.
+- Kept connections open after invalid subscription messages so clients can retry.
+- Added WebSocket tests for successful streaming and validation errors.
+- Updated `.env.example`, `README.md`, and API, architecture, plan, task, and session docs.
+
+### Verification performed
+
+- `npm run lint:api` passed Ruff checks.
+- `npm run api-test` passed all 14 backend tests.
+- Docker API healthcheck reached `healthy`.
+- A live Docker WebSocket client received both `subscribed` and `candle` messages.
+
+### Safety notes
+
+- Day 21 emits explicitly marked mock market data.
+- The WebSocket exposes no order, live trading, account write, or exchange write operation.
+
+## 2026-06-23 - Day 22 Real Market Stream Service
+
+### User request
+
+Implement Day 22.
+
+### Work completed
+
+- Replaced the Day 21 mock candle producer with Binance's public kline WebSocket.
+- Added explicit `websockets` runtime dependency.
+- Added strict normalization and OHLC range validation for Binance kline payloads.
+- Added `source`, `mock`, and candle `closed` fields to realtime messages.
+- Added `MarketStreamHub` with one upstream task per symbol/timeframe.
+- Added bounded queues that broadcast updates to all matching frontend clients.
+- Added resubscription cleanup and cancellation after the final client disconnects.
+- Added reconnect status events and bounded exponential backoff.
+- Added environment configuration for the Binance URL and reconnect delays.
+- Added unit and route tests for normalization, fan-out, reconnect, resubscribe, and cleanup.
+- Updated README, API, architecture, plan, task, and session documentation.
+
+### Verification performed
+
+- `python3 -m compileall -q apps/api/app apps/api/tests` passed.
+- `npm run lint:api` passed Ruff checks.
+- `npm run api-test` passed all 20 backend tests.
+- Docker API healthcheck reached `healthy`.
+- Live `/ws/market` smoke test received a real BTCUSDT 1m candle from Binance.
+
+### Safety notes
+
+- The Binance source uses the public market-data-only endpoint and needs no API key.
+- No account stream, order endpoint, live trading, or exchange write behavior was added.
+- Oanda-only symbols are not yet supported by the realtime stream.

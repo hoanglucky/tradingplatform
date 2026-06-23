@@ -8,7 +8,7 @@ Live real-money trading is intentionally out of scope for this scaffold. Exchang
 
 ## Implementation Status
 
-Current scaffold status as of 2026-06-20:
+Current scaffold status as of 2026-06-23:
 
 - Monorepo structure has been created.
 - Next.js frontend scaffold exists in `apps/web`.
@@ -21,6 +21,7 @@ Current scaffold status as of 2026-06-20:
 - SQLAlchemy models and Alembic migrations manage the core PostgreSQL schema.
 - The market-data service provides normalized Binance and Oanda candle data.
 - Market candles are cached in PostgreSQL with conflict-safe upserts.
+- The API exposes a validated market WebSocket backed by Binance public kline streams.
 
 Open architecture work:
 
@@ -54,6 +55,22 @@ Open architecture work:
 6. Backtest engine uses historical candles and strategy definitions to produce repeatable simulation results.
 7. Alert engine dispatches notifications for selected signals, risk states, and system failures.
 8. API exposes stable product contracts to the Next.js frontend.
+
+## Realtime Market Flow
+
+The Day 21 WebSocket path is intentionally isolated from exchange execution:
+
+1. A client connects to `WS /ws/market` on the API service.
+2. The client sends a `subscribe` message with a symbol and supported timeframe.
+3. Pydantic validates the message and normalizes the symbol to uppercase.
+4. The API acknowledges the active subscription.
+5. `MarketStreamHub` creates one Binance public kline connection for each active symbol/timeframe.
+6. Binance payloads are validated and normalized into the internal OHLCV candle contract.
+7. A bounded queue broadcasts each update to all matching frontend clients.
+8. The same client connection can replace its subscription or recover from an invalid message.
+9. The final unsubscribe cancels the upstream task; transient upstream failures trigger bounded exponential-backoff reconnects.
+
+The source uses Binance's market-data-only `data-stream.binance.vision` endpoint. The WebSocket contract has no account, order, or exchange-write capability. Oanda-only symbols require a separate future realtime source.
 
 ## Market Data Flow
 
