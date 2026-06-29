@@ -24,7 +24,7 @@ class MarketSubscribed(BaseModel):
     type: Literal["subscribed"] = "subscribed"
     symbol: str
     timeframe: Timeframe
-    source: Literal["binance"] = "binance"
+    source: Literal["binance", "oanda"]
     mock: Literal[False] = False
 
 
@@ -50,7 +50,7 @@ class MarketCandleUpdate(BaseModel):
     close: float = Field(gt=0)
     volume: float = Field(ge=0)
     closed: bool
-    source: Literal["binance"] = "binance"
+    source: Literal["binance", "oanda"] = "binance"
     mock: Literal[False] = False
 
     @model_validator(mode="after")

@@ -24,14 +24,62 @@ class SeedResult:
 
 
 DEFAULT_SYMBOLS: tuple[SymbolSeed, ...] = (
-    {"exchange": "binance", "symbol": "BTCUSDT", "base_asset": "BTC", "quote_asset": "USDT", "is_active": True},
-    {"exchange": "binance", "symbol": "ETHUSDT", "base_asset": "ETH", "quote_asset": "USDT", "is_active": True},
-    {"exchange": "binance", "symbol": "SOLUSDT", "base_asset": "SOL", "quote_asset": "USDT", "is_active": True},
-    {"exchange": "binance", "symbol": "BNBUSDT", "base_asset": "BNB", "quote_asset": "USDT", "is_active": True},
-    {"exchange": "binance", "symbol": "XRPUSDT", "base_asset": "XRP", "quote_asset": "USDT", "is_active": True},
-    {"exchange": "oanda", "symbol": "XAUUSD", "base_asset": "XAU", "quote_asset": "USD", "is_active": True},
-    {"exchange": "index", "symbol": "SP500", "base_asset": "SP500", "quote_asset": "USD", "is_active": True},
-    {"exchange": "index", "symbol": "US100", "base_asset": "US100", "quote_asset": "USD", "is_active": True},
+    {
+        "exchange": "binance",
+        "symbol": "BTCUSDT",
+        "base_asset": "BTC",
+        "quote_asset": "USDT",
+        "is_active": True,
+    },
+    {
+        "exchange": "binance",
+        "symbol": "ETHUSDT",
+        "base_asset": "ETH",
+        "quote_asset": "USDT",
+        "is_active": True,
+    },
+    {
+        "exchange": "binance",
+        "symbol": "SOLUSDT",
+        "base_asset": "SOL",
+        "quote_asset": "USDT",
+        "is_active": True,
+    },
+    {
+        "exchange": "binance",
+        "symbol": "BNBUSDT",
+        "base_asset": "BNB",
+        "quote_asset": "USDT",
+        "is_active": True,
+    },
+    {
+        "exchange": "binance",
+        "symbol": "XRPUSDT",
+        "base_asset": "XRP",
+        "quote_asset": "USDT",
+        "is_active": True,
+    },
+    {
+        "exchange": "oanda",
+        "symbol": "XAUUSD",
+        "base_asset": "XAU",
+        "quote_asset": "USD",
+        "is_active": True,
+    },
+    {
+        "exchange": "oanda",
+        "symbol": "SP500",
+        "base_asset": "SP500",
+        "quote_asset": "USD",
+        "is_active": True,
+    },
+    {
+        "exchange": "oanda",
+        "symbol": "US100",
+        "base_asset": "US100",
+        "quote_asset": "USD",
+        "is_active": True,
+    },
 )
 
 
@@ -42,7 +90,9 @@ async def seed_symbols(session: AsyncSession) -> SeedResult:
     skipped = 0
 
     for symbol_data in DEFAULT_SYMBOLS:
-        existing = await repo.get_by_symbol(symbol_data["exchange"], symbol_data["symbol"])
+        existing = await repo.get_by_symbol(
+            symbol_data["exchange"], symbol_data["symbol"]
+        )
         if existing is None:
             await repo.create(**symbol_data)
             created += 1

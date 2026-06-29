@@ -29,18 +29,17 @@
 
 ## Current review task
 
-Review the Day 27 watchlist API.
+Review the Day 30.3 multi-timeframe grid UI.
 
 Focus areas:
 
-- Confirm all watchlist routes resolve ownership through `get_mvp_user`.
-- Confirm the configured default watchlist is created idempotently.
-- Confirm GET returns watchlist metadata and joined symbol details.
-- Confirm POST normalizes symbol case and requires an active catalog symbol.
-- Confirm duplicate item insertion returns `409` without duplicate rows.
-- Confirm DELETE handles lowercase paths and returns `204` on success.
-- Confirm missing catalog symbols and missing items return distinct `404` responses.
-- Confirm tests isolate temporary users and do not modify the local MVP watchlist.
+- Confirm `MultiTimeframeGrid` renders only visible enabled windows.
+- Confirm 1/2/4/8 layouts use responsive 1/2/4-column rules.
+- Confirm every window displays the one shared symbol.
+- Confirm timeframe changes update only the targeted window ID.
+- Confirm Reviewed changes update only the targeted window ID.
+- Confirm placeholder regions do not fetch candles yet.
+- Confirm the old single live chart remains rendered below the grid.
 - Confirm no live trading or exchange write behavior was added.
 
 ## Verification commands

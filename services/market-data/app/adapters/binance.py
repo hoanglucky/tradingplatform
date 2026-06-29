@@ -55,7 +55,9 @@ class BinancePublicMarketDataProvider:
         payload = await self._get_json("/api/v3/exchangeInfo")
         symbols = payload.get("symbols")
         if not isinstance(symbols, list):
-            raise BinanceAdapterError("Binance exchangeInfo response is missing symbols.")
+            raise BinanceAdapterError(
+                "Binance exchangeInfo response is missing symbols."
+            )
 
         normalized: list[MarketSymbol] = []
         for item in symbols:
@@ -83,24 +85,42 @@ class BinancePublicMarketDataProvider:
         self._validate_timeframe(timeframe)
         self._validate_time_range(start, end)
 
-        rows = await self._get_json(
-            "/api/v3/klines",
-            params={
-                "symbol": symbol.upper(),
-                "interval": timeframe,
-                "startTime": self._to_milliseconds(start),
-                "endTime": self._to_milliseconds(end),
-                "limit": 1000,
-            },
-        )
-        if not isinstance(rows, list):
-            raise BinanceAdapterError("Binance klines response must be a list.")
+        cursor = self._to_milliseconds(start)
+        end_milliseconds = self._to_milliseconds(end)
+        normalized: dict[datetime, Candle] = {}
+        while cursor < end_milliseconds:
+            rows = await self._get_json(
+                "/api/v3/klines",
+                params={
+                    "symbol": symbol.upper(),
+                    "interval": timeframe,
+                    "startTime": cursor,
+                    "endTime": end_milliseconds - 1,
+                    "limit": 1000,
+                },
+            )
+            if not isinstance(rows, list):
+                raise BinanceAdapterError("Binance klines response must be a list.")
+            if not rows:
+                break
 
-        return [self._parse_kline(symbol.upper(), timeframe, row) for row in rows]
+            for row in rows:
+                parsed = self._parse_kline(symbol.upper(), timeframe, row)
+                normalized[parsed.timestamp] = parsed
+            if len(rows) < 1000:
+                break
+            last_open_time = rows[-1][0] if isinstance(rows[-1], list) else None
+            if not isinstance(last_open_time, int) or last_open_time < cursor:
+                raise BinanceAdapterError("Binance kline pagination did not advance.")
+            cursor = last_open_time + 1
+
+        return sorted(normalized.values(), key=lambda candle: candle.timestamp)
 
     async def get_latest_price(self, symbol: str) -> LatestPrice:
         self._validate_symbol(symbol)
-        payload = await self._get_json("/api/v3/ticker/price", params={"symbol": symbol.upper()})
+        payload = await self._get_json(
+            "/api/v3/ticker/price", params={"symbol": symbol.upper()}
+        )
         if not isinstance(payload, dict) or "price" not in payload:
             raise BinanceAdapterError("Binance ticker price response is invalid.")
 
@@ -112,18 +132,24 @@ class BinancePublicMarketDataProvider:
 
     async def _get_json(self, path: str, params: dict[str, Any] | None = None) -> Any:
         close_client = self._client is None
-        client = self._client or httpx.AsyncClient(base_url=self.base_url, timeout=self._timeout)
+        client = self._client or httpx.AsyncClient(
+            base_url=self.base_url, timeout=self._timeout
+        )
         try:
             response = await client.get(path, params=params)
         except httpx.HTTPError as exc:
-            raise BinanceAdapterError(f"Binance request failed: {exc.__class__.__name__}") from exc
+            raise BinanceAdapterError(
+                f"Binance request failed: {exc.__class__.__name__}"
+            ) from exc
         finally:
             if close_client:
                 await client.aclose()
 
         if response.status_code >= 400:
             detail = self._extract_error_detail(response)
-            raise BinanceAdapterError(f"Binance API error {response.status_code}: {detail}")
+            raise BinanceAdapterError(
+                f"Binance API error {response.status_code}: {detail}"
+            )
 
         try:
             return response.json()

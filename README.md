@@ -155,11 +155,13 @@ Current core endpoints:
 - `GET /watchlist`
 - `POST /watchlist/items`
 - `DELETE /watchlist/items/{symbol}`
+- `GET /settings`
+- `PATCH /settings`
 - `WS /ws/market`
 
 See [docs/api.md](docs/api.md) for request and response details.
 
-The market WebSocket accepts symbol/timeframe subscriptions and broadcasts normalized candles from Binance's public market-data-only kline stream. It shares one upstream connection per active symbol/timeframe, sends application heartbeats, removes stale clients, and reconnects upstream automatically after transient disconnects. Duplicate subscriptions are idempotent. No API key is required.
+The market WebSocket accepts symbol/timeframe subscriptions and broadcasts normalized candles from Binance public klines or Oanda read-only current-candle polling for `XAUUSD`, `SP500`, and `US100`. It shares one source per active symbol/timeframe, sends application heartbeats, removes stale clients, and reconnects automatically after transient disconnects.
 
 ## MVP User Mode
 
@@ -170,6 +172,8 @@ This is not authentication. It has no password, session, access control, or mult
 ## Watchlist API
 
 The default MVP user owns one watchlist configured with `MVP_WATCHLIST_NAME`. `GET /watchlist` creates it on first use, `POST /watchlist/items` adds an active catalog symbol, and `DELETE /watchlist/items/{symbol}` removes it. Symbols are normalized to uppercase and duplicate additions return HTTP `409`.
+
+The dashboard renders this watchlist as an interactive panel with active-symbol selection, add/remove controls, refresh, and loading/empty/error states. Each symbol links to `/dashboard/chart?symbol=...`, which initializes the chart to that market. Latest price remains an explicit placeholder until the watchlist quote task is implemented.
 
 ## Market Data Contracts
 
@@ -196,14 +200,17 @@ See [docs/market-data.md](docs/market-data.md) for market-data service details.
 
 ## Chart Workspace
 
-The chart workspace is available at `/dashboard/chart`. It fetches read-only history from `GET /market/candles`, then subscribes Binance selections to `WS /ws/market`. Realtime bars update an epoch-matched candle or append a newer candle without duplication, while the chart instance remains stable between ticks. Selection changes, refreshes, and unmounts close stale sockets. Unexpected disconnects retry with bounded exponential backoff, heartbeat messages receive pong replies, and the UI exposes connection state. Oanda-only symbols currently remain historical-only.
+The chart workspace is available at `/dashboard/chart`. It fetches read-only history from `GET /market/candles`, then subscribes Binance and Oanda selections to `WS /ws/market`. Realtime bars update an epoch-matched candle or append a newer candle without duplication, while the chart instance remains stable between ticks. Selection changes, refreshes, and unmounts close stale sockets. Unexpected disconnects retry with bounded exponential backoff, heartbeat messages receive pong replies, and the UI exposes connection state.
+
+The chart range control supports `1D`, `1W`, and `1M`. Oanda markets default to one month, while provider adapters paginate long ranges and PostgreSQL caches normalized candles for later requests.
+
+Chart symbol and timeframe preferences load from `GET /settings` before the initial candle request and save through serialized `PATCH /settings` calls. Reloading the chart restores the latest stored selections; a valid watchlist query symbol takes precedence and becomes the next default.
 
 The frontend realtime test suite covers existing-bar updates, new-bar appends, stale updates, duplicate timestamps, empty chart state, validation, reconnect backoff, and heartbeat pong messages. Run it through `npm run web-test`.
 
 ## Next Milestones
 
-1. Build the frontend watchlist panel.
-2. Add an Oanda-compatible realtime path for non-Binance symbols.
-3. Add durable event contracts between services.
+1. Persist frontend chart selections through the settings API.
+2. Add durable event contracts between services.
 4. Build paper order lifecycle and portfolio accounting.
 5. Add backtest result persistence and report views.

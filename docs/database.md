@@ -12,6 +12,8 @@ Current files:
 - `apps/api/migrations/env.py` loads application settings and SQLAlchemy metadata.
 - `apps/api/migrations/versions/20260618_0001_initial_empty.py` is the first empty migration.
 - `apps/api/migrations/versions/20260619_0002_core_tables.py` creates the first core tables.
+- `apps/api/migrations/versions/20260629_0003_oanda_index_symbols.py` assigns index CFDs to Oanda.
+- `apps/api/migrations/versions/20260629_0004_user_settings.py` adds one-to-one user preferences.
 
 ## Connection
 
@@ -67,6 +69,7 @@ Day 7 adds these tables:
 - `candles`
 - `watchlists`
 - `watchlist_items`
+- `user_settings`
 
 The `users` table stores the single local MVP identity used before authentication exists. `get_mvp_user` inserts `MVP_USER_EMAIL` with PostgreSQL conflict handling, so repeated requests resolve the same row instead of creating duplicates.
 
@@ -80,6 +83,9 @@ Important constraints and indexes:
 - `ix_candles_symbol_timeframe_timestamp` supports candle lookups by symbol, timeframe, and timestamp.
 - `watchlists.user_id + watchlists.name` is unique.
 - `watchlist_items.watchlist_id + watchlist_items.symbol_id` is unique.
+- `user_settings.user_id` is unique and cascades when its owner is deleted.
+
+The settings row stores the active default symbol, supported timeframe, JSON indicator slug list, theme, and IANA timezone. Repository creation uses a conflict-safe insert so concurrent first reads still produce one row per user.
 
 ## Day 6 Scope
 

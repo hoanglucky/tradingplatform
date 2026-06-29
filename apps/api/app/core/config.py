@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     cors_origins: str = "http://localhost:2000"
     binance_ws_base_url: str = "wss://data-stream.binance.vision/ws"
+    oanda_api_token: str = ""
+    oanda_environment: str = "practice"
+    oanda_realtime_poll_seconds: float = Field(default=2.0, ge=0.5, le=60)
     market_stream_reconnect_seconds: float = Field(default=1.0, gt=0, le=60)
     market_stream_max_reconnect_seconds: float = Field(default=30.0, gt=0, le=300)
     market_ws_heartbeat_seconds: float = Field(default=10.0, gt=0, le=60)

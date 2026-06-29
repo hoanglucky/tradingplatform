@@ -10,7 +10,25 @@ import {
   normalizeRealtimeCandle,
 } from "../lib/market-stream";
 import { CandlestickChart } from "./CandlestickChart";
+import { HISTORY_RANGES, historyStartSeconds, type HistoryRange } from "../lib/chart-history";
+import {
+  MULTI_TIMEFRAME_WINDOW_COUNTS,
+  createDefaultMultiTimeframeLayout,
+  resizeMultiTimeframeLayout,
+  updateMultiTimeframeSymbol,
+  updateMultiTimeframeWindow,
+  type MultiTimeframeTimeframe,
+} from "../lib/multi-timeframe";
+import {
+  getUserSettings,
+  patchUserSettings,
+  resolveChartPreferences,
+  type ChartPreferences,
+  type UserSettingsPatch,
+} from "../lib/user-settings";
+import { MultiTimeframeGrid } from "./MultiTimeframeGrid";
 
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 const marketDataBaseUrl = process.env.NEXT_PUBLIC_MARKET_DATA_BASE_URL ?? "http://localhost:8101";
 const marketWebSocketUrl = process.env.NEXT_PUBLIC_MARKET_WS_URL ?? "ws://localhost:8000/ws/market";
 
@@ -26,6 +44,8 @@ const SYMBOLS = [
   { value: "BTCUSDT", label: "BTC / USDT", provider: "Binance" },
   { value: "ETHUSDT", label: "ETH / USDT", provider: "Binance" },
   { value: "SOLUSDT", label: "SOL / USDT", provider: "Binance" },
+  { value: "BNBUSDT", label: "BNB / USDT", provider: "Binance" },
+  { value: "XRPUSDT", label: "XRP / USDT", provider: "Binance" },
   { value: "XAUUSD", label: "XAU / USD", provider: "Oanda" },
   { value: "SP500", label: "S&P 500", provider: "Oanda" },
   { value: "US100", label: "US 100", provider: "Oanda" },
@@ -33,6 +53,7 @@ const SYMBOLS = [
 
 const TIMEFRAMES = ["1m", "5m", "15m", "1h", "4h", "1d"] as const;
 type Timeframe = (typeof TIMEFRAMES)[number];
+type PreferenceStatus = "loading" | "ready" | "saving" | "error";
 type RealtimeStatus =
   | "disabled"
   | "connecting"
@@ -119,9 +140,14 @@ async function getErrorMessage(response: Response): Promise<string> {
   return `Market data request failed (${response.status}).`;
 }
 
-export function ChartWorkspace() {
-  const [symbol, setSymbol] = useState("BTCUSDT");
+export function ChartWorkspace({ initialSymbol }: { initialSymbol?: string }) {
+  const normalizedInitialSymbol = SYMBOLS.some((item) => item.value === initialSymbol?.toUpperCase())
+    ? initialSymbol?.toUpperCase() ?? "BTCUSDT"
+    : "BTCUSDT";
+  const initialProvider = SYMBOLS.find((item) => item.value === normalizedInitialSymbol)?.provider;
+  const [symbol, setSymbol] = useState(normalizedInitialSymbol);
   const [timeframe, setTimeframe] = useState<Timeframe>("15m");
+  const [historyRange, setHistoryRange] = useState<HistoryRange>(initialProvider === "Oanda" ? "30d" : "1d");
   const [candles, setCandles] = useState<Candle[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -129,7 +155,18 @@ export function ChartWorkspace() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [realtimeStatus, setRealtimeStatus] = useState<RealtimeStatus>("connecting");
   const [retryDelayMs, setRetryDelayMs] = useState<number | null>(null);
+  const [preferencesReady, setPreferencesReady] = useState(false);
+  const [preferenceStatus, setPreferenceStatus] = useState<PreferenceStatus>("loading");
+  const [multiTimeframeLayout, setMultiTimeframeLayout] = useState(() =>
+    createDefaultMultiTimeframeLayout(normalizedInitialSymbol),
+  );
   const connectionVersionRef = useRef(0);
+  const persistedPreferencesRef = useRef<ChartPreferences>({
+    symbol: normalizedInitialSymbol,
+    timeframe: "15m",
+  });
+  const settingsSaveQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const settingsSaveVersionRef = useRef(0);
   const selectedSymbol = SYMBOLS.find((item) => item.value === symbol) ?? SYMBOLS[0];
   const latest = candles.at(-1)?.close;
   const first = candles[0]?.open;
@@ -138,13 +175,102 @@ export function ChartWorkspace() {
   useEffect(() => {
     const controller = new AbortController();
 
+    void getUserSettings(apiBaseUrl, controller.signal)
+      .then((settings) => {
+        const supportedSymbols = SYMBOLS.map((item) => item.value);
+        const storedPreferences = resolveChartPreferences(
+          settings,
+          undefined,
+          supportedSymbols,
+          TIMEFRAMES,
+        );
+        const effectivePreferences = resolveChartPreferences(
+          settings,
+          initialSymbol,
+          supportedSymbols,
+          TIMEFRAMES,
+        );
+        persistedPreferencesRef.current = storedPreferences;
+        setSymbol(effectivePreferences.symbol);
+        setMultiTimeframeLayout((current) =>
+          updateMultiTimeframeSymbol(current, effectivePreferences.symbol),
+        );
+        setTimeframe(effectivePreferences.timeframe as Timeframe);
+        const provider = SYMBOLS.find((item) => item.value === effectivePreferences.symbol)?.provider;
+        setHistoryRange(provider === "Oanda" ? "30d" : "1d");
+        setPreferenceStatus("ready");
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setPreferenceStatus("error");
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setPreferencesReady(true);
+        }
+      });
+
+    return () => controller.abort();
+  }, [initialSymbol]);
+
+  useEffect(() => {
+    if (!preferencesReady) {
+      return;
+    }
+    const persisted = persistedPreferencesRef.current;
+    const patch: UserSettingsPatch = {};
+    if (symbol !== persisted.symbol) {
+      patch.default_symbol = symbol;
+    }
+    if (timeframe !== persisted.timeframe) {
+      patch.default_timeframe = timeframe;
+    }
+    if (Object.keys(patch).length === 0) {
+      return;
+    }
+
+    const saveVersion = ++settingsSaveVersionRef.current;
+    const operation = settingsSaveQueueRef.current
+      .catch(() => undefined)
+      .then(async () => {
+        if (settingsSaveVersionRef.current === saveVersion) {
+          setPreferenceStatus("saving");
+        }
+        const updated = await patchUserSettings(apiBaseUrl, patch);
+        persistedPreferencesRef.current = {
+          symbol: updated.default_symbol,
+          timeframe: updated.default_timeframe,
+        };
+      });
+    settingsSaveQueueRef.current = operation;
+    void operation.then(
+      () => {
+        if (settingsSaveVersionRef.current === saveVersion) {
+          setPreferenceStatus("ready");
+        }
+      },
+      () => {
+        if (settingsSaveVersionRef.current === saveVersion) {
+          setPreferenceStatus("error");
+        }
+      },
+    );
+  }, [preferencesReady, symbol, timeframe]);
+
+  useEffect(() => {
+    if (!preferencesReady) {
+      return;
+    }
+    const controller = new AbortController();
+
     async function loadCandles() {
       setLoading(true);
       setError(null);
 
       const interval = TIMEFRAME_SECONDS[timeframe];
       const endSeconds = Math.floor(Date.now() / 1000 / interval) * interval;
-      const startSeconds = endSeconds - interval * 120;
+      const startSeconds = historyStartSeconds(endSeconds, historyRange);
       const params = new URLSearchParams({
         symbol,
         timeframe,
@@ -175,13 +301,10 @@ export function ChartWorkspace() {
 
     void loadCandles();
     return () => controller.abort();
-  }, [refreshVersion, symbol, timeframe]);
+  }, [historyRange, preferencesReady, refreshVersion, symbol, timeframe]);
 
   useEffect(() => {
     const connectionVersion = ++connectionVersionRef.current;
-    if (selectedSymbol.provider !== "Binance") {
-      return;
-    }
     if (loading) {
       return;
     }
@@ -294,11 +417,38 @@ export function ChartWorkspace() {
   function selectSymbol(nextSymbol: string) {
     connectionVersionRef.current += 1;
     const nextProvider = SYMBOLS.find((item) => item.value === nextSymbol)?.provider;
-    setRealtimeStatus(nextProvider === "Binance" ? "connecting" : "disabled");
+    setRealtimeStatus(nextProvider ? "connecting" : "disabled");
     setRetryDelayMs(null);
     setCandles([]);
     setLastUpdated(null);
+    setHistoryRange(nextProvider === "Oanda" ? "30d" : "1d");
+    setMultiTimeframeLayout((current) => updateMultiTimeframeSymbol(current, nextSymbol));
     setSymbol(nextSymbol);
+  }
+
+  function selectHistoryRange(nextRange: HistoryRange) {
+    if (nextRange === historyRange) {
+      return;
+    }
+    setCandles([]);
+    setLastUpdated(null);
+    setHistoryRange(nextRange);
+  }
+
+  function selectReviewWindowCount(windowCount: (typeof MULTI_TIMEFRAME_WINDOW_COUNTS)[number]) {
+    setMultiTimeframeLayout((current) => resizeMultiTimeframeLayout(current, windowCount));
+  }
+
+  function selectReviewTimeframe(windowId: string, nextTimeframe: MultiTimeframeTimeframe) {
+    setMultiTimeframeLayout((current) =>
+      updateMultiTimeframeWindow(current, windowId, { timeframe: nextTimeframe }),
+    );
+  }
+
+  function setReviewChecked(windowId: string, reviewChecked: boolean) {
+    setMultiTimeframeLayout((current) =>
+      updateMultiTimeframeWindow(current, windowId, { reviewChecked }),
+    );
   }
 
   function selectTimeframe(nextTimeframe: Timeframe) {
@@ -306,7 +456,7 @@ export function ChartWorkspace() {
       return;
     }
     connectionVersionRef.current += 1;
-    setRealtimeStatus(selectedSymbol.provider === "Binance" ? "connecting" : "disabled");
+    setRealtimeStatus("connecting");
     setRetryDelayMs(null);
     setCandles([]);
     setLastUpdated(null);
@@ -315,7 +465,12 @@ export function ChartWorkspace() {
 
   return (
     <>
-      <header className="chart-toolbar">
+      <header
+        className="chart-toolbar"
+        data-review-symbol={multiTimeframeLayout.symbol}
+        data-review-window-count={multiTimeframeLayout.windowCount}
+        data-review-enabled-windows={multiTimeframeLayout.windows.filter((window) => window.enabled).length}
+      >
         <label className="chart-symbol-control">
           <span>Symbol</span>
           <select value={symbol} onChange={(event) => selectSymbol(event.target.value)}>
@@ -325,7 +480,14 @@ export function ChartWorkspace() {
               </option>
             ))}
           </select>
-          <small>{selectedSymbol.provider} · read-only</small>
+          <small>
+            {selectedSymbol.provider} · read-only
+            {preferenceStatus === "saving"
+              ? " · saving"
+              : preferenceStatus === "error"
+                ? " · settings unavailable"
+                : ""}
+          </small>
         </label>
         <div className="chart-timeframes" aria-label="Timeframe">
           {TIMEFRAMES.map((item) => (
@@ -337,6 +499,19 @@ export function ChartWorkspace() {
               onClick={() => selectTimeframe(item)}
             >
               {item}
+            </button>
+          ))}
+        </div>
+        <div className="chart-ranges" aria-label="History range">
+          {HISTORY_RANGES.map((item) => (
+            <button
+              key={item.value}
+              type="button"
+              className={historyRange === item.value ? "is-active" : undefined}
+              aria-pressed={historyRange === item.value}
+              onClick={() => selectHistoryRange(item.value)}
+            >
+              {item.label}
             </button>
           ))}
         </div>
@@ -371,12 +546,40 @@ export function ChartWorkspace() {
         </div>
       </header>
 
+      <section className="review-workspace-toolbar" aria-label="Multi-timeframe review layout">
+        <div className="review-workspace-title">
+          <span>Review layout</span>
+          <strong>{multiTimeframeLayout.symbol}</strong>
+        </div>
+        <div className="review-layout-selector" aria-label="Window count">
+          {MULTI_TIMEFRAME_WINDOW_COUNTS.map((windowCount) => (
+            <button
+              key={windowCount}
+              type="button"
+              className={multiTimeframeLayout.windowCount === windowCount ? "is-active" : undefined}
+              aria-pressed={multiTimeframeLayout.windowCount === windowCount}
+              aria-label={`${windowCount} chart ${windowCount === 1 ? "window" : "windows"}`}
+              onClick={() => selectReviewWindowCount(windowCount)}
+            >
+              {windowCount}
+            </button>
+          ))}
+        </div>
+        <small>{multiTimeframeLayout.windowCount} windows · shared symbol</small>
+      </section>
+
+      <MultiTimeframeGrid
+        layout={multiTimeframeLayout}
+        onTimeframeChange={selectReviewTimeframe}
+        onReviewChange={setReviewChecked}
+      />
+
       <section className="chart-workspace" aria-labelledby="chart-heading">
         <div className="chart-heading-row">
           <div>
             <p className="eyebrow">Price chart</p>
             <h2 id="chart-heading">
-              {selectedSymbol.label} · {timeframe}
+              {selectedSymbol.label} · {timeframe} · {HISTORY_RANGES.find((item) => item.value === historyRange)?.label}
             </h2>
           </div>
           <div className="chart-data-meta">

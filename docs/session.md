@@ -1171,3 +1171,171 @@ Implement Day 27.
 
 - Watchlist operations only modify local application data for the MVP user.
 - No exchange account, order action, live trading, or exchange write behavior was added.
+
+## 2026-06-29 - Day 28 Watchlist Frontend
+
+### User request
+
+Implement Day 28.
+
+### Work completed
+
+- Replaced the dashboard watchlist placeholder with a live `WatchlistPanel`.
+- Loaded the MVP watchlist and active symbol catalog concurrently.
+- Filtered pinned and inactive symbols from the add selector.
+- Added accessible icon controls for add, remove, and refresh.
+- Added stable loading, empty, initial-error, and mutation-error states.
+- Refreshed watchlist data after successful mutations without reloading the dashboard.
+- Added latest-price placeholders to watchlist rows.
+- Linked each symbol to `/dashboard/chart?symbol=...`.
+- Updated the chart route to accept and validate an initial symbol query.
+- Added BNBUSDT and XRPUSDT to supported chart markets.
+- Added shared watchlist TypeScript contracts and pure helper tests.
+- Updated README, architecture, plan, task, Codex task, and session documentation.
+
+### Verification performed
+
+- `npm run web-test` passed lint, 11 tests, typecheck, and production build.
+- `GET http://localhost:2000/` returned HTTP 200.
+- `GET http://localhost:2000/dashboard/chart?symbol=ETHUSDT` returned HTTP 200.
+- Server-rendered HTML marked ETHUSDT as the selected chart symbol.
+- `GET http://localhost:8000/watchlist` returned HTTP 200.
+
+### Safety notes
+
+- Watchlist UI mutates only local application watchlist data.
+- Chart links continue to consume read-only market data.
+- No account stream, order action, live trading, or exchange write behavior was added.
+## Day 28 follow-up - Watchlist on chart
+
+- Added the watchlist panel directly beside the chart workspace.
+- Watchlist symbol links now remount the chart workspace with the selected symbol.
+- Added a responsive single-column layout for smaller screens.
+- The watchlist remains available on the main dashboard.
+
+## 2026-06-29 - Oanda realtime follow-up and Day 29 settings API
+
+### Work completed
+
+- Routed `XAUUSD`, `SP500`, and `US100` through Oanda in the shared market WebSocket.
+- Added read-only current-candle polling every two seconds because the configured Oanda account pricing stream returns `403` while instrument candles return `200`.
+- Normalized Oanda candle events to the existing realtime OHLCV contract.
+- Added the missing Oanda provider assignment for SP500 and US100 through Alembic migration `20260629_0003`.
+- Added one-to-one user settings model, repository, schemas, and migration `20260629_0004`.
+- Added `GET /settings` and `PATCH /settings` with MVP user ownership and preference validation.
+- Added shared frontend `UserSettings` contract and updated architecture, API, database, plan, task, and README documentation.
+
+### Verification performed
+
+- Live WebSocket smoke tests received open Oanda candles for XAUUSD, SP500, and US100.
+- `npm run api-test` passed all 48 backend tests.
+- `npm run lint:api` passed after the settings implementation.
+- `npm run web-test` passed lint, 11 tests, typecheck, and production build.
+
+### Safety notes
+
+- Oanda integration reads instrument candles only.
+- Account pricing stream permissions were not bypassed.
+- No order, account mutation, live trading, or exchange write behavior was added.
+
+## 2026-06-29 - One-month chart history
+
+### Work completed
+
+- Added `1D`, `1W`, and `1M` history range controls to the chart toolbar.
+- Oanda chart links now default to one month of history at the existing 15-minute timeframe.
+- Added chunked Oanda requests for ranges beyond the 5000-candle provider limit.
+- Added paginated Binance requests for ranges beyond the 1000-kline provider limit.
+- Long-range candles continue to use PostgreSQL deduplication and caching.
+- Oanda cache coverage tolerates weekend edge gaps so month windows do not refetch unchanged closed-market periods.
+
+### Verification performed
+
+- Live 30-day `15m` requests returned 1866 candles each for XAUUSD, SP500, and US100.
+- The first returned candle was the first available market session after the weekend boundary.
+- Market-data and frontend regression suites passed after the range changes.
+
+### Safety notes
+
+- Historical requests are read-only.
+- No account mutation, trading, or exchange write path was added.
+
+## 2026-06-29 - Day 30 frontend settings persistence
+
+### Work completed
+
+- Added a typed frontend settings API client for `GET /settings` and `PATCH /settings`.
+- Delayed the first candle request until stored chart preferences resolve.
+- Restored supported default symbol and timeframe values on chart load.
+- Made a valid URL/watchlist symbol override the stored symbol and persist as the next default.
+- Serialized settings writes so rapid selection changes retain request order.
+- Kept chart fallbacks usable when the settings API is unavailable.
+- Added preference loading, precedence, fallback, GET, and PATCH regression tests.
+
+### Verification performed
+
+- `npm run web-test` passed lint, settings and realtime tests, typecheck, and production build.
+- Live API smoke testing confirmed settings survive consecutive reads.
+
+### Safety notes
+
+- Settings writes modify local application preferences only.
+- No order, account mutation, live trading, or exchange write behavior was added.
+
+## 2026-06-29 - Day 30.1 multi-timeframe workspace model
+
+### Work completed
+
+- Added TypeScript contracts for multi-timeframe windows, layouts, timeframes, and 1/2/4/8 window counts.
+- Added a default four-window layout using 4h, 1h, 15m, and 5m.
+- Added helpers that clone default window state and update one shared normalized symbol.
+- Added prepared multi-timeframe state to `ChartWorkspace` and synchronized it with settings and dropdown symbol changes.
+- Kept the state non-visual so Day 30.2 can add layout controls without changing the existing single-chart workflow early.
+
+### Verification performed
+
+- Four multi-timeframe model/state tests passed.
+- `npm run web-test` passed lint, 21 tests, typecheck, and production build.
+
+### Safety notes
+
+- No backend, market-data request, candle aggregation, signal, paper order, or exchange-write behavior was added.
+
+## 2026-06-29 - Day 30.2 multi-timeframe layout selector
+
+### Work completed
+
+- Added an accessible segmented selector for 1, 2, 4, and 8 review windows.
+- Added a visible active state and shared-symbol summary.
+- Added resize behavior that disables extra windows while preserving their timeframe and review state.
+- Restored hidden state when expanding and created stable unique windows when growing to eight.
+- Kept the existing single-chart workspace rendered below the prepared review controls.
+
+### Verification performed
+
+- Layout reduction, restoration, expansion, unique-ID, and state-preservation tests passed.
+- `npm run web-test` passed lint, 23 tests, typecheck, and production build.
+
+### Safety notes
+
+- No multi-window candle request, aggregation, strategy signal, paper order, or exchange write was added.
+
+## 2026-06-29 - Day 30.3 multi-timeframe grid UI
+
+### Work completed
+
+- Added a controlled `MultiTimeframeGrid` component for visible review windows.
+- Added per-window timeframe selectors and Reviewed checkboxes keyed by stable window IDs.
+- Added placeholder chart regions without connecting candle requests early.
+- Added responsive 1/2/4-column layouts with a one-column mobile fallback.
+- Kept one shared symbol across every window and retained the existing live single chart.
+
+### Verification performed
+
+- Per-window update and enabled-window filtering tests passed.
+- `npm run web-test` passed lint, 25 tests, typecheck, and production build.
+
+### Safety notes
+
+- Reviewed state remains local UI workflow state only.
+- No candle aggregation, strategy signal, paper order, or exchange write was added.

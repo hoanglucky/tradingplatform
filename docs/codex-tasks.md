@@ -147,15 +147,107 @@ Verified:
 
 ## Next task candidate
 
-### Day 28 - Watchlist frontend
+### Day 30.4 - Extended timeframe presets
 
 Suggested scope:
 
-- Add a dashboard watchlist panel backed by `GET /watchlist`.
-- Add symbol selection, add action, and remove controls.
-- Show loading, empty, and error states and refresh after mutations.
+- Add 30m and 2h review timeframe options.
+- Use the final distinct defaults for 1/2/4/8 layouts.
+- Keep the old single-chart timeframe selector unchanged.
 
 ## Recently completed
+
+### Day 30.3 - Multi-timeframe grid UI
+
+Implemented:
+
+- Added a controlled responsive `MultiTimeframeGrid` component.
+- Rendered visible windows for 1/2/4/8 layouts with one shared symbol.
+- Added per-window timeframe selectors, Reviewed checkboxes, and placeholder chart regions.
+- Added ID-scoped window updates and enabled-window filtering helpers.
+
+Verified:
+
+- Per-window isolation and visible-window tests pass.
+- `npm run web-test` passes lint, 25 tests, typecheck, and production build.
+- The existing single live chart remains rendered below the review grid.
+
+### Day 30.2 - Multi-timeframe layout selector
+
+Implemented:
+
+- Added accessible 1/2/4/8 segmented layout controls and active state.
+- Added layout resizing that disables rather than deletes hidden windows.
+- Restored preserved hidden state when expanding and appended stable defaults up to eight windows.
+- Displayed the one shared symbol without changing the single-chart renderer.
+
+Verified:
+
+- Resize-down and resize-up state-preservation tests pass.
+- `npm run web-test` passes lint, 23 tests, typecheck, and production build.
+
+### Day 30.1 - Multi-timeframe workspace model
+
+Implemented:
+
+- Added typed 1/2/4/8 window-count presets and multi-timeframe window/layout contracts.
+- Added the default 4h, 1h, 15m, and 5m four-window layout.
+- Added independent layout creation and shared-symbol update helpers.
+- Prepared chart-owned review state without rendering multi-window UI.
+
+Verified:
+
+- Four focused model/state tests pass.
+- `npm run web-test` passes lint, 21 tests, typecheck, and production build.
+- Existing single-chart candle and realtime paths remain unchanged.
+
+### Day 30 - Persist frontend settings
+
+Implemented:
+
+- Loaded chart defaults from `GET /settings` before the first candle request.
+- Applied stored symbol/timeframe with validated fallbacks.
+- Gave valid chart URL symbols priority over the stored default.
+- Serialized `PATCH /settings` calls after symbol/timeframe changes.
+- Added compact saving/error status without blocking chart usage.
+
+Verified:
+
+- Frontend settings tests cover stored defaults, URL precedence, fallbacks, GET, and PATCH payloads.
+- `npm run web-test` passes lint, 17 tests, typecheck, and production build.
+- Settings API persistence smoke test preserves values across consecutive reads.
+
+### Day 29 - User settings API and Oanda realtime follow-up
+
+Implemented:
+
+- Added Oanda realtime candle updates for XAUUSD, SP500, and US100 through the existing market WebSocket.
+- Added Oanda provider routing, normalized source metadata, current-candle polling, and catalog migration.
+- Added one-to-one user settings persistence with `GET /settings` and `PATCH /settings`.
+- Validated active symbol, timeframe, indicator slugs, theme, and IANA timezone.
+
+Verified:
+
+- Live WebSocket smoke tests received open Oanda candles for all three symbols.
+- `npm run api-test` passes all 48 backend tests.
+- `npm run web-test` passes lint, 11 tests, typecheck, and production build.
+
+### Day 28 - Watchlist frontend
+
+Implemented:
+
+- Replaced the dashboard watchlist placeholder with a live client panel.
+- Added active unpinned symbol selection, add, remove, and refresh controls.
+- Added loading, empty, API error, and pending-mutation states.
+- Added latest-price placeholders for each row.
+- Linked symbols to the chart with a validated query parameter.
+- Added BNBUSDT and XRPUSDT to chart-supported Binance markets.
+
+Verified:
+
+- `npm run web-test` passes lint, 11 tests, typecheck, and production build.
+- Dashboard and symbol-query chart routes return HTTP 200.
+- Server-rendered chart query selects the requested supported symbol.
 
 ### Day 27 - Watchlist API
 

@@ -1,6 +1,7 @@
 import { Badge, Panel } from "@trading-framework/ui";
 import { AppShell } from "../components/AppShell";
 import { EmptySection } from "../components/EmptySection";
+import { WatchlistPanel } from "../components/WatchlistPanel";
 import { getDashboardData } from "../lib/api";
 
 export default async function Home() {
@@ -47,11 +48,7 @@ export default async function Home() {
               <Badge tone="neutral">{safety.exchange_adapter_mode}</Badge>
             </div>
           </Panel>
-          <EmptySection
-            title="Watchlist"
-            description="Pinned symbols will appear here."
-            items={["BTCUSDT", "ETHUSDT", "Add/remove controls"]}
-          />
+          <WatchlistPanel />
           <EmptySection
             title="Latest signals"
             description="Strategy signals will stay paper-only in the MVP."

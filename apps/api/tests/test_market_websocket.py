@@ -93,6 +93,22 @@ def test_market_websocket_subscribes_and_receives_binance_candle(monkeypatch) ->
     assert hub.unsubscriptions[0].symbol == "BTCUSDT"
 
 
+def test_market_websocket_acknowledges_oanda_source(monkeypatch) -> None:
+    hub = FakeMarketStreamHub()
+    monkeypatch.setattr(market_websocket_routes, "market_stream_hub", hub)
+
+    with client.websocket_connect("/ws/market") as websocket:
+        websocket.send_json(
+            {"type": "subscribe", "symbol": "XAUUSD", "timeframe": "1m"}
+        )
+        acknowledgement = websocket.receive_json()
+
+        assert acknowledgement["source"] == "oanda"
+        assert acknowledgement["symbol"] == "XAUUSD"
+
+    assert hub.wait_for_unsubscriptions(1)
+
+
 def test_market_websocket_rejects_invalid_subscription(monkeypatch) -> None:
     hub = FakeMarketStreamHub()
     monkeypatch.setattr(market_websocket_routes, "market_stream_hub", hub)

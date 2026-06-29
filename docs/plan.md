@@ -1041,9 +1041,13 @@ Features:
 
 **Done checklist:**
 
-* [ ] Watchlist visible
-* [ ] Click loads chart
-* [ ] Add/remove works
+* [x] Watchlist visible
+* [x] Click loads chart
+* [x] Add/remove works
+
+**Implementation note - 2026-06-29:**
+
+The dashboard now contains a live watchlist panel backed by the Day 27 API. It loads active catalog symbols, filters pinned/inactive choices, supports add, remove, manual refresh, and explicit loading/empty/error states, and shows a latest-price placeholder. Symbol links open `/dashboard/chart?symbol=...`; the chart page validates the query and initializes the matching Binance or Oanda market.
 
 ---
 
@@ -1069,9 +1073,13 @@ Endpoints:
 
 **Done checklist:**
 
-* [ ] Settings table/model exists
-* [ ] API works
-* [ ] Tests pass
+* [x] Settings table/model exists
+* [x] API works
+* [x] Tests pass
+
+**Implementation note - 2026-06-29:**
+
+Added a one-to-one `user_settings` model and migration plus conflict-safe lazy creation. `GET /settings` returns defaults and `PATCH /settings` persists validated active symbol, timeframe, unique indicator slugs, theme, and IANA timezone for the MVP user. Backend suite passes 48 tests.
 
 ---
 
@@ -1092,10 +1100,774 @@ Requirements:
 
 **Done checklist:**
 
-* [ ] Settings load
-* [ ] Settings save
-* [ ] Refresh keeps preferences
+* [x] Settings load
+* [x] Settings save
+* [x] Refresh keeps preferences
 
+**Implementation note - 2026-06-29:**
+
+The chart now loads settings before requesting candles, applies the stored default symbol and timeframe, and serializes preference PATCH requests after selection changes. A valid URL/watchlist symbol overrides the stored symbol and is then persisted as the new default. API failures keep usable local fallbacks and expose a compact settings status beside the read-only provider label.
+
+
+
+# Multi-timeframe Review Workspace — Day 30.x Extension
+
+## 1. Mục tiêu
+
+Bổ sung cụm task sau **Day 30 — Persist frontend settings** để tạo một màn hình review đa khung thời gian cho web trading framework.
+
+Mục tiêu của tính năng này:
+
+- Một symbol chính dùng chung cho toàn bộ workspace.
+- User có thể chọn layout gồm **1 / 2 / 4 / 8 cửa sổ chart**.
+- Mỗi cửa sổ chart có timeframe riêng.
+- Mỗi cửa sổ có checkbox **Reviewed** để tick khi đã xem xong khung đó.
+- Có bộ đếm tiến độ review, ví dụ: `Reviewed 2/4 timeframes`.
+- Có thể lưu layout, timeframe và trạng thái review vào settings.
+- Sau đó có thể nối từng cửa sổ với `/market/candles` để lấy nến riêng theo timeframe.
+
+Tính năng này phục vụ workflow phân tích thủ công đa khung thời gian:
+
+```txt
+1D  -> xem xu hướng lớn
+4H  -> xem vùng chính
+1H  -> xem cấu trúc/setup
+15M -> xem vùng entry
+5M  -> timing
+1M  -> timing chi tiết
+```
+
+---
+
+## 2. Nguyên tắc triển khai
+
+### Bắt buộc
+
+- Chỉ dùng **một symbol chung** cho toàn bộ layout.
+- Không tạo symbol riêng cho từng cửa sổ.
+- Mỗi cửa sổ chỉ được chọn timeframe riêng.
+- Không implement live trading.
+- Không coi checkbox review là tín hiệu giao dịch.
+- Không hardcode dữ liệu chart.
+- Không làm candle aggregation trong Day 30.x.
+- Không phá flow single-chart cũ.
+- Mỗi task nhỏ phải có test hoặc manual verification rõ ràng.
+
+### Chưa làm ở cụm Day 30.x
+
+- Không tự build nến 5m/15m/1h từ nến 1m.
+- Không implement strategy đa khung.
+- Không implement signal confirmation đa khung.
+- Không thêm live order.
+- Không thêm AI prediction.
+
+---
+
+## 3. Data structure đề xuất
+
+```ts
+export type ReviewTimeframe =
+  | "1m"
+  | "5m"
+  | "15m"
+  | "30m"
+  | "1h"
+  | "2h"
+  | "4h"
+  | "1d";
+
+export type MultiTimeframeWindow = {
+  id: string;
+  timeframe: ReviewTimeframe;
+  enabled: boolean;
+  reviewChecked: boolean;
+};
+
+export type MultiTimeframeLayout = {
+  symbol: string;
+  windowCount: 1 | 2 | 4 | 8;
+  windows: MultiTimeframeWindow[];
+};
+```
+
+---
+
+## 4. Default layout
+
+### 1 window
+
+```txt
+15m
+```
+
+### 2 windows
+
+```txt
+1h
+15m
+```
+
+### 4 windows
+
+```txt
+4h
+1h
+15m
+5m
+```
+
+### 8 windows
+
+```txt
+1d
+4h
+2h
+1h
+30m
+15m
+5m
+1m
+```
+
+---
+
+# Day 30.1 — Multi-timeframe workspace model
+
+## Goal
+
+Chuẩn bị state/type cho màn review đa khung thời gian.
+
+## Codex task
+
+```txt
+You are working inside the trading-framework repo.
+
+Task:
+Add multi-timeframe workspace state for the chart page.
+
+Context:
+The app already has symbol/timeframe selection and user settings persistence.
+We now need to prepare a multi-timeframe review workspace for one selected symbol.
+
+Requirements:
+- Create TypeScript types for MultiTimeframeWindow and MultiTimeframeLayout.
+- One workspace uses one shared symbol.
+- Support window count presets: 1, 2, 4, 8.
+- Each window has:
+  - id
+  - timeframe
+  - enabled
+  - reviewChecked
+- Default symbol should use current selected symbol.
+- Default window count: 4.
+- Default 4-window layout:
+  - 4h
+  - 1h
+  - 15m
+  - 5m
+- Do not connect API yet.
+- Do not change backend.
+- Keep old single-chart behavior working.
+
+Output:
+1. Implement the types and default layout helpers.
+2. Add tests or manual verification steps.
+3. Explain changed files.
+4. Mention how to run and verify.
+```
+
+## Done checklist
+
+```txt
+[x] MultiTimeframeLayout type exists
+[x] MultiTimeframeWindow type exists
+[x] Default 4-window config exists
+[x] State updates without breaking old chart
+[x] Old single-chart behavior still works
+```
+
+**Implementation note - 2026-06-29:**
+
+Added typed window-count presets, `MultiTimeframeLayout`, `MultiTimeframeWindow`, immutable default-layout helpers, and shared-symbol updates. `ChartWorkspace` now owns a prepared four-window review state synchronized with settings and manual symbol changes; no multi-window UI, API request, backend change, or candle aggregation was introduced.
+
+---
+
+# Day 30.2 — Layout selector 1 / 2 / 4 / 8
+
+## Goal
+
+Cho phép user chọn số cửa sổ chart muốn xem.
+
+## UI concept
+
+```txt
+Layout: [1] [2] [4] [8]
+Symbol: BTCUSDT
+Review mode: ON/OFF
+```
+
+## Codex task
+
+```txt
+You are working inside the trading-framework repo.
+
+Task:
+Create layout selector for multi-timeframe chart workspace.
+
+Context:
+The app needs a manual multi-timeframe review workspace.
+The workspace uses one shared symbol and multiple timeframe windows.
+
+Requirements:
+- Add UI buttons for layout presets:
+  - 1 window
+  - 2 windows
+  - 4 windows
+  - 8 windows
+- Selecting a layout updates windowCount.
+- When changing layout:
+  - Preserve existing window timeframe/reviewChecked state where possible.
+  - Add default windows if increasing count.
+  - Hide extra windows if decreasing count.
+- Keep one shared symbol for all windows.
+- Do not create separate symbol per window.
+- Add simple visual active state for selected layout.
+- Keep old single-chart behavior working.
+
+Output:
+1. Implement layout selector UI.
+2. Add tests or manual verification steps.
+3. Explain changed files.
+4. Mention how to run and verify.
+```
+
+## Done checklist
+
+```txt
+[x] User can select 1 window
+[x] User can select 2 windows
+[x] User can select 4 windows
+[x] User can select 8 windows
+[x] Active layout is visible
+[x] Existing state is preserved where possible
+[x] One shared symbol is used for all windows
+```
+
+**Implementation note - 2026-06-29:**
+
+Added an accessible segmented selector for 1, 2, 4, and 8 review windows. Resizing marks extra windows disabled instead of deleting them, restores hidden timeframe/review state when expanding, and appends stable default windows when needed. The selector displays the single shared workspace symbol while the existing single chart remains active below it.
+
+---
+
+# Day 30.3 — Multi-timeframe grid UI
+
+## Goal
+
+Hiển thị nhiều chart theo layout đã chọn.
+
+## Layout concept
+
+### 1 window
+
+```txt
+[ chart ]
+```
+
+### 2 windows
+
+```txt
+[ chart ][ chart ]
+```
+
+### 4 windows
+
+```txt
+[ chart ][ chart ]
+[ chart ][ chart ]
+```
+
+### 8 windows
+
+```txt
+[ chart ][ chart ][ chart ][ chart ]
+[ chart ][ chart ][ chart ][ chart ]
+```
+
+Với màn nhỏ, layout có thể responsive thành 1 hoặc 2 cột.
+
+## Codex task
+
+```txt
+You are working inside the trading-framework repo.
+
+Task:
+Create MultiTimeframeGrid component.
+
+Context:
+The user needs a review workspace with 1, 2, 4, or 8 chart windows for the same symbol.
+
+Requirements:
+- Render chart windows based on selected windowCount.
+- Support layouts: 1, 2, 4, 8.
+- Each chart window should show:
+  - symbol
+  - timeframe selector
+  - review checkbox
+  - placeholder chart area for now
+- Use same selected symbol for all windows.
+- Each window can select its own timeframe.
+- Do not fetch candles yet.
+- Keep responsive layout.
+- Empty/disabled windows should not crash UI.
+- Keep old single-chart behavior working.
+
+Output:
+1. Implement MultiTimeframeGrid component.
+2. Add tests or manual verification steps.
+3. Explain changed files.
+4. Mention how to run and verify.
+```
+
+## Done checklist
+
+```txt
+[x] MultiTimeframeGrid component exists
+[x] 1-window layout renders
+[x] 2-window layout renders
+[x] 4-window layout renders
+[x] 8-window layout renders
+[x] Each window has timeframe selector
+[x] Each window has review checkbox
+[x] Responsive layout works
+```
+
+**Implementation note - 2026-06-29:**
+
+Added a controlled `MultiTimeframeGrid` that renders only visible/enabled windows for the selected layout. Each repeated window shows the shared symbol, its own timeframe selector, a Reviewed checkbox, and a stable placeholder area. Window updates are keyed by ID, the grid responds from four to two to one column, and the existing live single chart remains unchanged below it.
+
+---
+
+# Day 30.4 — Extended timeframe presets
+
+## Goal
+
+Mở rộng timeframe để layout 8 cửa sổ có đủ khung khác nhau.
+
+## Final supported review timeframes
+
+```txt
+1m
+5m
+15m
+30m
+1h
+2h
+4h
+1d
+```
+
+## Codex task
+
+```txt
+You are working inside the trading-framework repo.
+
+Task:
+Extend timeframe options for multi-timeframe review mode.
+
+Context:
+The existing chart selector supports basic timeframes.
+The multi-timeframe workspace needs enough distinct timeframes for 8 windows.
+
+Requirements:
+- Keep existing supported timeframes:
+  - 1m
+  - 5m
+  - 15m
+  - 1h
+  - 4h
+  - 1d
+- Add optional review timeframes:
+  - 30m
+  - 2h
+- Final multi-timeframe options:
+  - 1m
+  - 5m
+  - 15m
+  - 30m
+  - 1h
+  - 2h
+  - 4h
+  - 1d
+- Default layouts:
+  - 1 window: 15m
+  - 2 windows: 1h, 15m
+  - 4 windows: 4h, 1h, 15m, 5m
+  - 8 windows: 1d, 4h, 2h, 1h, 30m, 15m, 5m, 1m
+- Do not implement candle aggregation.
+- The backend should still request candles directly by selected timeframe.
+- Keep old single-chart selector working.
+
+Output:
+1. Implement the extended timeframe options.
+2. Add tests or manual verification steps.
+3. Explain changed files.
+4. Mention how to run and verify.
+```
+
+## Done checklist
+
+```txt
+[ ] 30m option exists
+[ ] 2h option exists
+[ ] 8-window default has 8 different timeframes
+[ ] Old single-chart timeframe selector still works
+[ ] No candle aggregation added in this task
+```
+
+---
+
+# Day 30.5 — Review checkbox per window
+
+## Goal
+
+Mỗi khung có checkbox để đánh dấu đã review.
+
+## Example
+
+```txt
+[✓] 1D reviewed
+[✓] 4H reviewed
+[ ] 1H reviewed
+[ ] 15M reviewed
+```
+
+## Review progress
+
+```txt
+Reviewed 2/4 timeframes
+```
+
+## Codex task
+
+```txt
+You are working inside the trading-framework repo.
+
+Task:
+Add review checkbox behavior for each multi-timeframe window.
+
+Context:
+The multi-timeframe workspace is for manual review.
+The checkbox is only a user workflow aid, not a trading signal.
+
+Requirements:
+- Each chart window has a checkbox labeled "Reviewed".
+- Ticking checkbox updates reviewChecked for that window only.
+- Add a review progress indicator:
+  - Example: Reviewed 2/4 timeframes
+- Add a "Clear review" button.
+- Clear review should uncheck all visible/enabled windows.
+- Do not store review as trading signal.
+- Do not trigger strategy or paper trading from review checkbox.
+- This is only for manual review workflow.
+
+Output:
+1. Implement review checkbox behavior.
+2. Add tests or manual verification steps.
+3. Explain changed files.
+4. Mention how to run and verify.
+```
+
+## Done checklist
+
+```txt
+[ ] Each window has Reviewed checkbox
+[ ] Checkbox updates correct window
+[ ] Review progress visible
+[ ] Clear review works
+[ ] Review checkbox does not create trading signal
+[ ] Review checkbox does not trigger paper order
+```
+
+---
+
+# Day 30.6 — Persist multi-timeframe layout
+
+## Goal
+
+Reload lại web vẫn giữ layout đang xem.
+
+## Settings payload example
+
+```json
+{
+  "default_symbol": "BTCUSDT",
+  "default_timeframe": "15m",
+  "selected_indicators": [],
+  "theme": "dark",
+  "multi_timeframe_layout": {
+    "symbol": "BTCUSDT",
+    "windowCount": 4,
+    "windows": [
+      {
+        "id": "w1",
+        "timeframe": "4h",
+        "enabled": true,
+        "reviewChecked": false
+      },
+      {
+        "id": "w2",
+        "timeframe": "1h",
+        "enabled": true,
+        "reviewChecked": false
+      },
+      {
+        "id": "w3",
+        "timeframe": "15m",
+        "enabled": true,
+        "reviewChecked": false
+      },
+      {
+        "id": "w4",
+        "timeframe": "5m",
+        "enabled": true,
+        "reviewChecked": false
+      }
+    ]
+  }
+}
+```
+
+## Codex task
+
+```txt
+You are working inside the trading-framework repo.
+
+Task:
+Persist multi-timeframe layout in user settings.
+
+Context:
+Day 30 already persists frontend settings.
+Now extend settings to include the multi-timeframe review layout.
+
+Requirements:
+- Extend frontend settings type to include multi_timeframe_layout.
+- Extend backend settings schema/model if needed.
+- Save:
+  - selected symbol
+  - windowCount
+  - each window timeframe
+  - each window enabled state
+  - each window reviewChecked state
+- Load saved layout on page refresh.
+- If saved layout is invalid, fallback to default 4-window layout.
+- Do not break existing settings:
+  - default_symbol
+  - default_timeframe
+  - selected_indicators
+  - theme
+- Do not hardcode user-specific values.
+
+Output:
+1. Implement settings persistence for multi-timeframe layout.
+2. Add tests or manual verification steps.
+3. Explain changed files.
+4. Mention how to run and verify.
+```
+
+## Done checklist
+
+```txt
+[ ] Layout saves
+[ ] Layout reloads after refresh
+[ ] Invalid saved layout falls back safely
+[ ] Existing settings still work
+[ ] Existing default_symbol still works
+[ ] Existing default_timeframe still works
+```
+
+---
+
+# Day 30.7 — Connect multi-window charts to candles API
+
+## Goal
+
+Mỗi cửa sổ chart lấy nến riêng theo timeframe của nó.
+
+## API behavior
+
+Một symbol chung, nhiều request theo timeframe:
+
+```txt
+GET /market/candles?symbol=BTCUSDT&timeframe=4h
+GET /market/candles?symbol=BTCUSDT&timeframe=1h
+GET /market/candles?symbol=BTCUSDT&timeframe=15m
+GET /market/candles?symbol=BTCUSDT&timeframe=5m
+```
+
+## Important decision
+
+Ở task này vẫn lấy nến trực tiếp theo timeframe từ backend/provider.
+Không tự build timeframe lớn từ nến 1m.
+
+## Codex task
+
+```txt
+You are working inside the trading-framework repo.
+
+Task:
+Connect multi-timeframe windows to market candles API.
+
+Context:
+The app already has a market candles endpoint:
+GET /market/candles
+
+The multi-timeframe workspace uses one shared symbol and multiple chart windows.
+Each enabled window should load its own timeframe independently.
+
+Requirements:
+- Each enabled chart window fetches candles from:
+  GET /market/candles
+- Use same symbol for all windows.
+- Use each window's selected timeframe.
+- Show loading state per window.
+- Show error state per window.
+- Do not let one failed timeframe break other windows.
+- Use existing CandlestickChart component.
+- Do not duplicate chart logic.
+- Do not implement candle aggregation here.
+- Do not hardcode candles.
+- Keep old single-chart behavior working.
+
+Output:
+1. Connect multi-window charts to the candles API.
+2. Add tests or manual verification steps.
+3. Explain changed files.
+4. Mention how to run and verify.
+```
+
+## Done checklist
+
+```txt
+[ ] Each window loads candles
+[ ] Different timeframes show independently
+[ ] Loading state works per window
+[ ] Error state works per window
+[ ] One failed window does not crash whole page
+[ ] Existing CandlestickChart component is reused
+[ ] No candle aggregation added in this task
+```
+
+---
+
+# 5. Suggested implementation order
+
+```txt
+30.1 State/type
+30.2 Layout selector
+30.3 Grid UI
+30.4 Timeframe presets
+30.5 Review checkbox
+30.6 Persist settings
+30.7 Fetch candles
+```
+
+Không nên nhảy thẳng vào fetch nhiều chart ngay từ đầu. Nên làm UI/state trước để dễ debug, sau đó mới nối API.
+
+---
+
+# 6. Manual verification checklist
+
+Sau khi hoàn thành cụm Day 30.x, kiểm tra theo flow:
+
+```txt
+1. Mở chart page.
+2. Chọn symbol BTCUSDT.
+3. Chọn layout 1 window.
+4. Đổi timeframe trong window.
+5. Chọn layout 2 windows.
+6. Chọn layout 4 windows.
+7. Chọn layout 8 windows.
+8. Tick Reviewed ở từng window.
+9. Kiểm tra progress Reviewed x/y.
+10. Bấm Clear review.
+11. Reload page.
+12. Kiểm tra layout/timeframe/review state được load lại.
+13. Nếu đã làm Day 30.7, kiểm tra mỗi window gọi đúng /market/candles theo timeframe riêng.
+14. Kiểm tra lỗi một timeframe không làm crash toàn bộ workspace.
+```
+
+---
+
+# 7. Notes for backend/provider
+
+Hiện tại MVP nên lấy nến trực tiếp theo timeframe user chọn:
+
+```txt
+Chart request timeframe nào -> backend/provider lấy timeframe đó -> cache vào DB.
+```
+
+Ví dụ:
+
+```txt
+BTCUSDT 1m  -> provider 1m  -> DB candles timeframe=1m
+BTCUSDT 5m  -> provider 5m  -> DB candles timeframe=5m
+BTCUSDT 15m -> provider 15m -> DB candles timeframe=15m
+BTCUSDT 1h  -> provider 1h  -> DB candles timeframe=1h
+```
+
+Chưa nên bắt buộc lấy nến 1m rồi tự build mọi timeframe trong cụm Day 30.x.
+
+Candle aggregation nên để task riêng sau này:
+
+```txt
+services/market-data/candle_aggregator.py
+```
+
+Quy tắc aggregation sau này:
+
+```txt
+open   = open của cây đầu tiên
+high   = max high trong nhóm
+low    = min low trong nhóm
+close  = close của cây cuối cùng
+volume = sum volume
+timestamp = thời điểm mở bucket
+```
+
+---
+
+# 8. Definition of done
+
+Tính năng multi-timeframe review workspace được xem là xong khi:
+
+```txt
+[ ] User chọn được 1 / 2 / 4 / 8 cửa sổ.
+[ ] Tất cả cửa sổ dùng chung một symbol.
+[ ] Mỗi cửa sổ chọn được timeframe riêng.
+[ ] Mỗi cửa sổ có checkbox Reviewed.
+[ ] Có progress Reviewed x/y.
+[ ] Có Clear review.
+[ ] Layout được lưu vào settings.
+[ ] Reload page không mất layout.
+[ ] Khi nối API, từng cửa sổ lấy candles độc lập.
+[ ] Một cửa sổ lỗi không làm lỗi toàn bộ workspace.
+[ ] Không có live trading code.
+[ ] Không có candle aggregation trong Day 30.x.
+```
+
+---
+
+# 9. Commit message suggestions
+
+```txt
+feature: add multi-timeframe workspace types
+feature: add multi-timeframe layout selector
+feature: add multi-timeframe chart grid
+feature: add review checklist for timeframe windows
+feature: persist multi-timeframe layout settings
+feature: connect multi-timeframe charts to market candles api
+fix: preserve multi-timeframe state when changing layout
+```
 ---
 
 ## Week 7 — Indicator engine

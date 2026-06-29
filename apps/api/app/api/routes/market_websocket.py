@@ -13,7 +13,11 @@ from app.schemas.market_websocket import (
     MarketSubscription,
     MarketWebSocketError,
 )
-from app.services.market_stream import MarketStreamEvent, market_stream_hub
+from app.services.market_stream import (
+    MarketStreamEvent,
+    market_source_for_symbol,
+    market_stream_hub,
+)
 
 router = APIRouter()
 ClientMessage = MarketSubscription | MarketPong
@@ -93,6 +97,7 @@ async def market_websocket(websocket: WebSocket) -> None:
                     acknowledgement = MarketSubscribed(
                         symbol=subscription.symbol,
                         timeframe=subscription.timeframe,
+                        source=market_source_for_symbol(subscription.symbol),
                     )
                     await websocket.send_json(acknowledgement.model_dump(mode="json"))
                     continue
@@ -109,6 +114,7 @@ async def market_websocket(websocket: WebSocket) -> None:
                 acknowledgement = MarketSubscribed(
                     symbol=subscription.symbol,
                     timeframe=subscription.timeframe,
+                    source=market_source_for_symbol(subscription.symbol),
                 )
                 await websocket.send_json(acknowledgement.model_dump(mode="json"))
                 continue

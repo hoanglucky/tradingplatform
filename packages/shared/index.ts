@@ -40,6 +40,46 @@ export type Candle = {
   volume: number;
 };
 
+export type MarketSymbol = {
+  id: string;
+  exchange: string;
+  symbol: string;
+  base_asset: string;
+  quote_asset: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type WatchlistItem = {
+  id: string;
+  symbol_id: string;
+  exchange: string;
+  symbol: string;
+  base_asset: string;
+  quote_asset: string;
+  created_at: string;
+};
+
+export type Watchlist = {
+  id: string;
+  user_id: string;
+  name: string;
+  items: WatchlistItem[];
+};
+
+export type UserSettings = {
+  id: string;
+  user_id: string;
+  default_symbol: string;
+  default_timeframe: "1m" | "5m" | "15m" | "1h" | "4h" | "1d";
+  selected_indicators: string[];
+  theme: "light" | "dark" | "system";
+  timezone: string;
+  created_at: string;
+  updated_at: string;
+};
+
 export type StrategySignal = {
   strategyId: string;
   symbol: string;

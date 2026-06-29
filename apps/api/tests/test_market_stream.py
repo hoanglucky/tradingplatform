@@ -7,7 +7,10 @@ from app.schemas.market_websocket import MarketCandleUpdate, MarketSubscription
 from app.services.market_stream import (
     BinanceStreamError,
     MarketStreamHub,
+    OandaStreamError,
+    market_source_for_symbol,
     normalize_binance_kline,
+    normalize_oanda_candle,
 )
 
 
@@ -99,6 +102,64 @@ def test_normalize_binance_kline_rejects_non_boolean_closed_state() -> None:
                 },
             }
         )
+
+
+def test_normalize_oanda_current_candle() -> None:
+    active_subscription = MarketSubscription(
+        type="subscribe", symbol="XAUUSD", timeframe="1m"
+    )
+    result = normalize_oanda_candle(
+        {
+            "candles": [
+                {
+                    "complete": False,
+                    "volume": 42,
+                    "time": "2026-06-29T08:31:00Z",
+                    "mid": {
+                        "o": "2325.10",
+                        "h": "2326.40",
+                        "l": "2324.80",
+                        "c": "2326.05",
+                    },
+                }
+            ]
+        },
+        active_subscription,
+    )
+
+    assert result.symbol == "XAUUSD"
+    assert result.close == 2326.05
+    assert result.closed is False
+    assert result.source == "oanda"
+
+
+def test_normalize_oanda_candle_rejects_invalid_data() -> None:
+    active_subscription = MarketSubscription(
+        type="subscribe", symbol="SP500", timeframe="5m"
+    )
+    with pytest.raises(OandaStreamError, match="invalid OHLCV"):
+        normalize_oanda_candle(
+            {
+                "candles": [
+                    {
+                        "complete": False,
+                        "volume": 1,
+                        "time": "2026-06-29T08:30:00Z",
+                        "mid": {"o": "10", "h": "9", "l": "8", "c": "11"},
+                    }
+                ]
+            },
+            active_subscription,
+        )
+
+
+@pytest.mark.parametrize("symbol", ["XAUUSD", "SP500", "US100"])
+def test_market_source_routes_oanda_symbols(symbol: str) -> None:
+    assert market_source_for_symbol(symbol) == "oanda"
+
+
+def test_market_source_defaults_to_binance() -> None:
+    assert market_source_for_symbol("BTCUSDT") == "binance"
 
 
 class ControlledSource:

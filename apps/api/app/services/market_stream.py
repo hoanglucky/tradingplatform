@@ -2,8 +2,9 @@ import asyncio
 import json
 from collections.abc import AsyncIterator
 from datetime import datetime, timezone
-from typing import Protocol, TypeAlias
+from typing import Any, Protocol, TypeAlias
 
+import httpx
 from pydantic import ValidationError
 from websockets.asyncio.client import connect
 from websockets.exceptions import WebSocketException
@@ -18,9 +19,30 @@ from app.schemas.market_websocket import (
 
 MarketStreamEvent: TypeAlias = MarketCandleUpdate | MarketWebSocketError
 StreamKey: TypeAlias = tuple[str, str]
+OANDA_SYMBOL_MAP = {
+    "XAUUSD": "XAU_USD",
+    "SP500": "SPX500_USD",
+    "US100": "NAS100_USD",
+}
+OANDA_TIMEFRAMES = {
+    "1m": "M1",
+    "5m": "M5",
+    "15m": "M15",
+    "1h": "H1",
+    "4h": "H4",
+    "1d": "D",
+}
 
 
-class BinanceStreamError(RuntimeError):
+class MarketStreamError(RuntimeError):
+    pass
+
+
+class BinanceStreamError(MarketStreamError):
+    pass
+
+
+class OandaStreamError(MarketStreamError):
     pass
 
 
@@ -94,6 +116,125 @@ class BinanceMarketStreamSource:
                 yield candle
 
 
+def market_source_for_symbol(symbol: str) -> str:
+    return "oanda" if symbol.upper() in OANDA_SYMBOL_MAP else "binance"
+
+
+def normalize_oanda_candle(
+    payload: object, subscription: MarketSubscription
+) -> MarketCandleUpdate:
+    if not isinstance(payload, dict):
+        raise OandaStreamError("Oanda response must be an object.")
+    candles = payload.get("candles")
+    if (
+        not isinstance(candles, list)
+        or not candles
+        or not isinstance(candles[-1], dict)
+    ):
+        raise OandaStreamError("Oanda response is missing candle data.")
+    candle: dict[str, Any] = candles[-1]
+    mid = candle.get("mid")
+    if not isinstance(mid, dict) or not isinstance(candle.get("complete"), bool):
+        raise OandaStreamError("Oanda candle contains invalid price data.")
+
+    try:
+        return MarketCandleUpdate(
+            symbol=subscription.symbol,
+            timeframe=subscription.timeframe,
+            timestamp=datetime.fromisoformat(
+                str(candle["time"]).replace("Z", "+00:00")
+            ),
+            open=float(mid["o"]),
+            high=float(mid["h"]),
+            low=float(mid["l"]),
+            close=float(mid["c"]),
+            volume=float(candle["volume"]),
+            closed=candle["complete"],
+            source="oanda",
+        )
+    except (KeyError, TypeError, ValueError, ValidationError) as error:
+        raise OandaStreamError("Oanda candle contains invalid OHLCV data.") from error
+
+
+class OandaMarketStreamSource:
+    def __init__(
+        self,
+        *,
+        client: httpx.AsyncClient | None = None,
+        poll_seconds: float | None = None,
+    ) -> None:
+        self.client = client
+        self.poll_seconds = poll_seconds or settings.oanda_realtime_poll_seconds
+
+    async def stream(
+        self, subscription: MarketSubscription
+    ) -> AsyncIterator[MarketCandleUpdate]:
+        instrument = OANDA_SYMBOL_MAP.get(subscription.symbol)
+        granularity = OANDA_TIMEFRAMES.get(subscription.timeframe)
+        if instrument is None or granularity is None:
+            raise OandaStreamError("Unsupported Oanda realtime subscription.")
+        if not settings.oanda_api_token:
+            raise OandaStreamError("OANDA_API_TOKEN is required for realtime candles.")
+
+        close_client = self.client is None
+        client = self.client or httpx.AsyncClient(base_url=self._base_url(), timeout=10)
+        previous: MarketCandleUpdate | None = None
+        try:
+            while True:
+                try:
+                    response = await client.get(
+                        f"/v3/instruments/{instrument}/candles",
+                        params={"count": 1, "granularity": granularity, "price": "M"},
+                        headers={
+                            "Authorization": f"Bearer {settings.oanda_api_token}",
+                            "Accept-Datetime-Format": "RFC3339",
+                        },
+                    )
+                    response.raise_for_status()
+                    update = normalize_oanda_candle(response.json(), subscription)
+                except (httpx.HTTPError, ValueError) as error:
+                    raise OandaStreamError(
+                        f"Oanda realtime request failed: {error.__class__.__name__}"
+                    ) from error
+
+                if update != previous:
+                    previous = update
+                    yield update
+                await asyncio.sleep(self.poll_seconds)
+        finally:
+            if close_client:
+                await client.aclose()
+
+    @staticmethod
+    def _base_url() -> str:
+        if settings.oanda_environment == "practice":
+            return "https://api-fxpractice.oanda.com"
+        if settings.oanda_environment == "live":
+            return "https://api-fxtrade.oanda.com"
+        raise OandaStreamError("OANDA_ENVIRONMENT must be practice or live.")
+
+
+class RoutedMarketStreamSource:
+    def __init__(
+        self,
+        binance: MarketStreamSource | None = None,
+        oanda: MarketStreamSource | None = None,
+    ) -> None:
+        self.binance = binance or BinanceMarketStreamSource()
+        self.oanda = oanda or OandaMarketStreamSource()
+
+    async def stream(
+        self, subscription: MarketSubscription
+    ) -> AsyncIterator[MarketCandleUpdate]:
+        source = (
+            self.oanda
+            if market_source_for_symbol(subscription.symbol) == "oanda"
+            else self.binance
+        )
+        async for candle in source.stream(subscription):
+            yield candle
+
+
 class MarketStreamHub:
     def __init__(
         self,
@@ -101,7 +242,7 @@ class MarketStreamHub:
         reconnect_seconds: float | None = None,
         max_reconnect_seconds: float | None = None,
     ) -> None:
-        self.source = source or BinanceMarketStreamSource()
+        self.source = source or RoutedMarketStreamSource()
         self.reconnect_seconds = (
             reconnect_seconds or settings.market_stream_reconnect_seconds
         )
@@ -153,11 +294,11 @@ class MarketStreamHub:
                 try:
                     async for candle in self.source.stream(subscription):
                         await self._broadcast(key, candle)
-                    raise BinanceStreamError("Binance stream ended unexpectedly.")
+                    raise MarketStreamError("Market stream ended unexpectedly.")
                 except asyncio.CancelledError:
                     raise
                 except (
-                    BinanceStreamError,
+                    MarketStreamError,
                     OSError,
                     WebSocketException,
                 ) as error:

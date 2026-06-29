@@ -184,6 +184,172 @@ h2 {
   gap: 14px;
 }
 
+.watchlist-panel {
+  display: grid;
+  gap: 14px;
+  min-height: 250px;
+}
+
+.watchlist-header,
+.watchlist-add,
+.watchlist-items li,
+.watchlist-symbol-link {
+  display: flex;
+  align-items: center;
+}
+
+.watchlist-header {
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.watchlist-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.watchlist-add {
+  align-items: end;
+  gap: 8px;
+}
+
+.watchlist-add label {
+  display: grid;
+  flex: 1;
+  gap: 5px;
+  min-width: 0;
+}
+
+.watchlist-add label > span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.watchlist-add select {
+  width: 100%;
+  min-width: 0;
+  min-height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.84rem;
+  padding: 0 8px;
+}
+
+.watchlist-icon-button {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.watchlist-icon-button:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent-strong);
+}
+
+.watchlist-icon-button.is-danger:hover:not(:disabled) {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.watchlist-icon-button:disabled {
+  cursor: wait;
+  opacity: 0.5;
+}
+
+.watchlist-icon-button .is-spinning {
+  animation: chart-spin 700ms linear infinite;
+}
+
+.watchlist-add select:focus-visible,
+.watchlist-icon-button:focus-visible,
+.watchlist-symbol-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.watchlist-items {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.watchlist-items li {
+  min-height: 54px;
+  border-top: 1px solid var(--line);
+  gap: 8px;
+}
+
+.watchlist-symbol-link {
+  min-width: 0;
+  flex: 1;
+  justify-content: space-between;
+  gap: 8px;
+  border-radius: 4px;
+}
+
+.watchlist-symbol-link > span,
+.watchlist-price {
+  display: grid;
+  gap: 2px;
+}
+
+.watchlist-symbol-link strong,
+.watchlist-price strong {
+  font-size: 0.84rem;
+}
+
+.watchlist-symbol-link small,
+.watchlist-price small {
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+.watchlist-symbol-link small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.watchlist-price {
+  min-width: 48px;
+  justify-items: end;
+}
+
+.watchlist-state {
+  display: grid;
+  min-height: 112px;
+  align-content: center;
+  justify-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.84rem;
+  text-align: center;
+}
+
+.watchlist-state strong {
+  color: var(--ink);
+}
+
+.watchlist-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
 .status-row,
 .module-header {
   display: flex;
@@ -243,13 +409,25 @@ h2 {
 
 .chart-page {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  align-items: start;
   gap: 12px;
   min-width: 0;
 }
 
+.chart-main-column,
+.chart-watchlist-column {
+  min-width: 0;
+}
+
+.chart-watchlist-column {
+  position: sticky;
+  top: 18px;
+}
+
 .chart-toolbar {
   display: grid;
-  grid-template-columns: minmax(150px, 1fr) auto minmax(190px, 1fr);
+  grid-template-columns: minmax(150px, 1fr) auto auto minmax(190px, 1fr);
   align-items: center;
   gap: 18px;
   min-height: 64px;
@@ -289,7 +467,8 @@ h2 {
   padding: 0 32px 0 10px;
 }
 
-.chart-timeframes {
+.chart-timeframes,
+.chart-ranges {
   display: flex;
   align-items: center;
   gap: 2px;
@@ -299,7 +478,8 @@ h2 {
   padding: 3px;
 }
 
-.chart-timeframes button {
+.chart-timeframes button,
+.chart-ranges button {
   display: grid;
   min-width: 42px;
   min-height: 32px;
@@ -314,17 +494,20 @@ h2 {
   font-weight: 750;
 }
 
-.chart-timeframes .is-active {
+.chart-timeframes .is-active,
+.chart-ranges .is-active {
   background: #e1f4f1;
   color: var(--accent-strong);
 }
 
-.chart-timeframes button:hover {
+.chart-timeframes button:hover,
+.chart-ranges button:hover {
   background: #eef4f4;
   color: var(--ink);
 }
 
 .chart-timeframes button:focus-visible,
+.chart-ranges button:focus-visible,
 .chart-symbol-control select:focus-visible,
 .chart-refresh-button:focus-visible {
   outline: 2px solid var(--accent);
@@ -340,6 +523,193 @@ h2 {
   align-items: center;
   justify-content: flex-end;
   gap: 12px;
+}
+
+.review-workspace-toolbar {
+  display: flex;
+  min-height: 52px;
+  align-items: center;
+  gap: 14px;
+  border-bottom: 1px solid var(--line);
+  padding: 6px 0 10px;
+}
+
+.review-workspace-title {
+  display: grid;
+  min-width: 130px;
+  gap: 2px;
+}
+
+.review-workspace-title span,
+.review-workspace-toolbar small {
+  color: var(--muted);
+  font-size: 0.74rem;
+}
+
+.review-workspace-title strong {
+  font-size: 0.86rem;
+}
+
+.review-layout-selector {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 3px;
+}
+
+.review-layout-selector button {
+  display: grid;
+  width: 36px;
+  height: 30px;
+  place-items: center;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.review-layout-selector button:hover {
+  background: #eef4f4;
+  color: var(--ink);
+}
+
+.review-layout-selector button.is-active {
+  background: #e1f4f1;
+  color: var(--accent-strong);
+}
+
+.review-layout-selector button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.review-workspace-toolbar > small {
+  margin-left: auto;
+  text-align: right;
+}
+
+.multi-timeframe-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.multi-timeframe-grid.is-layout-1 {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.multi-timeframe-grid.is-layout-8 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.multi-timeframe-window {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  overflow: hidden;
+}
+
+.multi-timeframe-window-header {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-bottom: 1px solid var(--line);
+  padding: 8px 10px;
+}
+
+.multi-timeframe-window-header > div {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 7px;
+}
+
+.multi-timeframe-window-header span,
+.review-window-timeframe > span {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.multi-timeframe-window-header strong {
+  font-size: 0.82rem;
+}
+
+.review-window-check {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+.review-window-check input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--accent-strong);
+}
+
+.review-window-timeframe {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-bottom: 1px solid var(--line);
+  padding: 7px 10px;
+}
+
+.review-window-timeframe select {
+  min-width: 76px;
+  min-height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 700;
+  padding: 0 24px 0 8px;
+}
+
+.review-window-timeframe select:focus-visible,
+.review-window-check input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.review-window-placeholder {
+  display: grid;
+  min-height: 138px;
+  align-content: center;
+  justify-items: center;
+  gap: 4px;
+  background: var(--panel-soft);
+  color: var(--muted);
+}
+
+.multi-timeframe-grid.is-layout-1 .review-window-placeholder {
+  min-height: 260px;
+}
+
+.review-window-placeholder span {
+  font-size: 0.72rem;
+}
+
+.review-window-placeholder strong {
+  color: var(--ink);
+  font-size: 1rem;
 }
 
 .chart-quote strong {
@@ -482,9 +852,14 @@ h2 {
 @media (max-width: 900px) {
   .app-frame,
   .dashboard-grid,
+  .chart-page,
   .module-grid,
   .system-strip {
     grid-template-columns: 1fr;
+  }
+
+  .chart-watchlist-column {
+    position: static;
   }
 
   .sidebar {
@@ -510,13 +885,23 @@ h2 {
   }
 
   .chart-timeframes {
-    grid-column: 1 / -1;
+    grid-column: 1;
     grid-row: 2;
     justify-self: stretch;
   }
 
-  .chart-timeframes button {
+  .chart-ranges {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .chart-timeframes button,
+  .chart-ranges button {
     flex: 1;
+  }
+
+  .multi-timeframe-grid.is-layout-8 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -535,8 +920,25 @@ h2 {
   }
 
   .chart-market-summary,
-  .chart-timeframes {
+  .chart-timeframes,
+  .chart-ranges {
     grid-column: 1;
+  }
+
+  .review-workspace-toolbar {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .review-workspace-toolbar > small {
+    width: 100%;
+    margin-left: 0;
+    text-align: left;
+  }
+
+  .multi-timeframe-grid,
+  .multi-timeframe-grid.is-layout-8 {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .chart-market-summary {
@@ -550,6 +952,10 @@ h2 {
 
   .chart-timeframes {
     grid-row: 3;
+  }
+
+  .chart-ranges {
+    grid-row: 4;
     overflow-x: auto;
   }
 
@@ -561,7 +967,8 @@ h2 {
 
 @media (prefers-reduced-motion: reduce) {
   .chart-spinner,
-  .chart-refresh-button .is-spinning {
+  .chart-refresh-button .is-spinning,
+  .watchlist-icon-button .is-spinning {
     animation: none;
   }
 }

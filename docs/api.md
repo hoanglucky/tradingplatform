@@ -142,7 +142,7 @@ The server first acknowledges the active subscription:
 }
 ```
 
-It then broadcasts normalized updates from Binance's public kline stream:
+It then broadcasts normalized updates from the routed Binance or Oanda source:
 
 ```json
 {
@@ -184,9 +184,9 @@ Clients must respond with the matching id:
 
 A client that does not return a matching pong before `MARKET_WS_STALE_SECONDS` is closed with WebSocket code `1001`. Sending the same subscription repeatedly only returns another acknowledgement; it does not create a duplicate upstream subscription.
 
-The API shares one upstream Binance connection between clients using the same symbol/timeframe. If Binance disconnects, clients receive a `market_stream_reconnecting` error event while the hub retries with bounded exponential backoff. The queue for each client is bounded; when a client cannot keep up, the oldest pending update is replaced by newer market data.
+The API shares one upstream source between clients using the same symbol/timeframe. If a provider disconnects, clients receive a `market_stream_reconnecting` error event while the hub retries with bounded exponential backoff. The queue for each client is bounded; when a client cannot keep up, the oldest pending update is replaced by newer market data.
 
-Current realtime support is for Binance-listed symbols. Oanda-only symbols remain available through the historical candle HTTP endpoint and require a future realtime adapter.
+Realtime support includes Binance-listed symbols plus Oanda `XAUUSD`, `SP500`, and `US100`. Oanda updates the current read-only instrument candle every two seconds by default because the configured account pricing stream returns `403`.
 
 Configuration:
 
@@ -194,13 +194,14 @@ Configuration:
 BINANCE_WS_BASE_URL=wss://data-stream.binance.vision/ws
 MARKET_STREAM_RECONNECT_SECONDS=1
 MARKET_STREAM_MAX_RECONNECT_SECONDS=30
+OANDA_REALTIME_POLL_SECONDS=2
 MARKET_WS_HEARTBEAT_SECONDS=10
 MARKET_WS_STALE_SECONDS=30
 NEXT_PUBLIC_MARKET_WS_RECONNECT_MS=1000
 NEXT_PUBLIC_MARKET_WS_MAX_RECONNECT_MS=15000
 ```
 
-The Binance stream is public and read-only. No API key, account access, order action, or exchange write operation is used.
+Both realtime paths are read-only. No order action or exchange write operation is available.
 
 ## Module endpoints
 
@@ -353,6 +354,28 @@ Configuration:
 
 ```env
 MVP_WATCHLIST_NAME=Main
+```
+
+## User Settings Endpoints
+
+Settings belong to the configured MVP user and are created lazily with `BTCUSDT`, `15m`, no indicators, system theme, and UTC timezone.
+
+### `GET /settings`
+
+Returns the current persisted preferences.
+
+### `PATCH /settings`
+
+Accepts any subset of `default_symbol`, `default_timeframe`, `selected_indicators`, `theme`, and `timezone`. The default symbol must exist in the active catalog; timeframe and theme use fixed choices; indicators use unique lowercase slug names; timezone must be a valid IANA name.
+
+```json
+{
+  "default_symbol": "XAUUSD",
+  "default_timeframe": "5m",
+  "selected_indicators": ["sma", "rsi_14"],
+  "theme": "dark",
+  "timezone": "Asia/Bangkok"
+}
 ```
 
 ## Market Data Endpoints

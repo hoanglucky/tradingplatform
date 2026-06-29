@@ -27,7 +27,9 @@ TIMEFRAME_DURATION = {
 
 
 class CandleRepositoryProtocol(Protocol):
-    async def get_symbol_id(self, symbol: str, exchange: str | None = None) -> uuid.UUID | None: ...
+    async def get_symbol_id(
+        self, symbol: str, exchange: str | None = None
+    ) -> uuid.UUID | None: ...
 
     async def list_range(
         self,
@@ -38,13 +40,17 @@ class CandleRepositoryProtocol(Protocol):
         end: datetime,
     ) -> list[Candle]: ...
 
-    async def upsert_many(self, symbol_id: uuid.UUID, candles: list[Candle]) -> None: ...
+    async def upsert_many(
+        self, symbol_id: uuid.UUID, candles: list[Candle]
+    ) -> None: ...
 
     async def commit(self) -> None: ...
 
 
 class CandleStorageService:
-    def __init__(self, repository: CandleRepositoryProtocol, provider: MarketDataProvider) -> None:
+    def __init__(
+        self, repository: CandleRepositoryProtocol, provider: MarketDataProvider
+    ) -> None:
         self.repository = repository
         self.provider = provider
 
@@ -60,17 +66,23 @@ class CandleStorageService:
         if symbol_id is None:
             raise SymbolNotFoundError(f"Symbol {symbol.upper()} is not registered.")
 
-        cached = await self.repository.list_range(symbol_id, symbol, timeframe, start, end)
-        if self._cache_covers_range(cached, timeframe, start, end):
+        cached = await self.repository.list_range(
+            symbol_id, symbol, timeframe, start, end
+        )
+        if self._cache_covers_range(cached, timeframe, start, end, exchange):
             return cached
 
-        fetched = await self.provider.get_historical_candles(symbol, timeframe, start, end)
+        fetched = await self.provider.get_historical_candles(
+            symbol, timeframe, start, end
+        )
         unique = list({candle.timestamp: candle for candle in fetched}.values())
         unique.sort(key=lambda candle: candle.timestamp)
         await self.repository.upsert_many(symbol_id, unique)
         await self.repository.commit()
 
-        return await self.repository.list_range(symbol_id, symbol, timeframe, start, end)
+        return await self.repository.list_range(
+            symbol_id, symbol, timeframe, start, end
+        )
 
     @staticmethod
     def _cache_covers_range(
@@ -78,8 +90,13 @@ class CandleStorageService:
         timeframe: str,
         start: datetime,
         end: datetime,
+        exchange: str | None = None,
     ) -> bool:
         duration = TIMEFRAME_DURATION.get(timeframe)
         if not candles or duration is None:
             return False
-        return candles[0].timestamp <= start and candles[-1].timestamp + duration >= end
+        edge_tolerance = timedelta(days=3) if exchange == "oanda" else duration
+        return (
+            candles[0].timestamp <= start + edge_tolerance
+            and candles[-1].timestamp + edge_tolerance >= end
+        )

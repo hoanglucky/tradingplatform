@@ -21,7 +21,7 @@ Current scaffold status as of 2026-06-29:
 - SQLAlchemy models and Alembic migrations manage the core PostgreSQL schema.
 - The market-data service provides normalized Binance and Oanda candle data.
 - Market candles are cached in PostgreSQL with conflict-safe upserts.
-- The API exposes a validated market WebSocket backed by Binance public kline streams.
+- The API exposes a validated market WebSocket backed by Binance streams and Oanda read-only candle updates.
 
 Open architecture work:
 
@@ -34,6 +34,14 @@ Open architecture work:
 The local MVP uses one configured PostgreSQL user resolved through `get_mvp_user`. The dependency performs an idempotent insert by email and is the only identity source intended for watchlist and settings routes until authentication is implemented. `GET /users/me` exposes the resolved local identity for development diagnostics.
 
 The watchlist API resolves that dependency on every request and lazily creates one named watchlist per user. PostgreSQL uniqueness constraints and conflict-safe inserts enforce one watchlist name per user and one occurrence of each symbol per watchlist. API responses join catalog symbol metadata for direct frontend rendering.
+
+The dashboard and chart watchlist panels call the API directly from the browser, refresh after mutations, and only offer active unpinned symbols. A symbol link passes the market through the chart query string; the chart validates supported symbols before initializing state. Binance and Oanda chart symbols both receive realtime WebSocket candle updates.
+
+User settings are also owned by the MVP user through a one-to-one `user_settings` row. `GET /settings` lazily creates defaults and `PATCH /settings` validates and persists symbol, timeframe, indicators, theme, and IANA timezone preferences.
+
+The chart waits for its initial settings read before requesting candles. Stored symbol/timeframe values initialize the controls; a valid symbol query from the watchlist takes precedence and is persisted. Subsequent selection writes use a serialized client queue so rapid changes cannot be overwritten by an older request finishing later.
+
+The chart also owns a prepared multi-timeframe review model with one shared symbol, 1/2/4/8 window-count presets, and independent timeframe/enabled/review state per window. Day 30.1 initializes four windows at 4h, 1h, 15m, and 5m while deliberately leaving the existing single-chart renderer and data flow unchanged.
 
 MVP user mode is not an authentication system: there are no credentials, sessions, roles, permissions, or tenant boundaries. It must be disabled and replaced with authenticated request identity before public or multi-user deployment.
 
@@ -72,8 +80,8 @@ The Day 21 WebSocket path is intentionally isolated from exchange execution:
 2. The client sends a `subscribe` message with a symbol and supported timeframe.
 3. Pydantic validates the message and normalizes the symbol to uppercase.
 4. The API acknowledges the active subscription.
-5. `MarketStreamHub` creates one Binance public kline connection for each active symbol/timeframe.
-6. Binance payloads are validated and normalized into the internal OHLCV candle contract.
+5. `MarketStreamHub` routes Binance symbols to public kline streams and `XAUUSD`, `SP500`, and `US100` to Oanda.
+6. Oanda fetches the current read-only candle every `OANDA_REALTIME_POLL_SECONDS`; both provider payloads normalize into the same OHLCV contract.
 7. A bounded queue broadcasts each update to all matching frontend clients.
 8. The chart replaces an epoch-matched last candle or appends a strictly newer candle.
 9. A symbol/timeframe change closes the frontend socket before opening a new subscription.
@@ -81,7 +89,7 @@ The Day 21 WebSocket path is intentionally isolated from exchange execution:
 11. Unexpected frontend disconnects retry with bounded exponential backoff; each new socket sends one subscription.
 12. The final unsubscribe cancels the upstream task; transient upstream failures trigger bounded exponential-backoff reconnects.
 
-The source uses Binance's market-data-only `data-stream.binance.vision` endpoint. The WebSocket contract has no account, order, or exchange-write capability. Oanda-only symbols require a separate future realtime source.
+The Binance source uses the market-data-only `data-stream.binance.vision` endpoint. The Oanda account pricing stream currently returns `403` for the configured practice account, so realtime Oanda candles use the account-independent instrument endpoint that the token can read. The WebSocket contract has no account mutation, order, or exchange-write capability.
 
 ## Market Data Flow
 
@@ -96,6 +104,8 @@ The market-data request path is:
 7. Provider payloads are normalized into the internal `Candle` schema.
 8. Candles are deduplicated in memory by timestamp and upserted into PostgreSQL.
 9. The service reads the final range from PostgreSQL and returns normalized candles.
+
+For long chart ranges, adapters paginate before storage: Oanda splits requests below its 5000-candle limit and Binance advances through 1000-kline pages. The chart exposes fixed 1-day, 1-week, and 1-month windows; Oanda markets default to one month.
 
 ### Provider Contract
 

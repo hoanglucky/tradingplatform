@@ -30,13 +30,17 @@ def make_candle(timestamp: datetime, close: str = "100.00") -> Candle:
 
 
 class FakeRepository:
-    def __init__(self, candles: list[Candle] | None = None, symbol_exists: bool = True) -> None:
+    def __init__(
+        self, candles: list[Candle] | None = None, symbol_exists: bool = True
+    ) -> None:
         self.symbol_id = uuid.uuid4() if symbol_exists else None
         self.candles = {candle.timestamp: candle for candle in candles or []}
         self.upserted: list[Candle] = []
         self.commits = 0
 
-    async def get_symbol_id(self, symbol: str, exchange: str | None = None) -> uuid.UUID | None:
+    async def get_symbol_id(
+        self, symbol: str, exchange: str | None = None
+    ) -> uuid.UUID | None:
         return self.symbol_id
 
     async def list_range(
@@ -48,7 +52,11 @@ class FakeRepository:
         end: datetime,
     ) -> list[Candle]:
         return sorted(
-            [candle for timestamp, candle in self.candles.items() if start <= timestamp < end],
+            [
+                candle
+                for timestamp, candle in self.candles.items()
+                if start <= timestamp < end
+            ],
             key=lambda candle: candle.timestamp,
         )
 
@@ -61,10 +69,9 @@ class FakeRepository:
 
 
 class FakeProvider:
-    exchange = "binance"
-
-    def __init__(self, candles: list[Candle]) -> None:
+    def __init__(self, candles: list[Candle], exchange: str = "binance") -> None:
         self.candles = candles
+        self.exchange = exchange
         self.calls = 0
 
     async def get_symbols(self):
@@ -92,11 +99,32 @@ async def test_returns_complete_cached_range_without_provider_call() -> None:
     provider = FakeProvider([])
     service = CandleStorageService(repository, provider)
 
-    result = await service.get_candles("BTCUSDT", "1m", start, start + timedelta(minutes=2))
+    result = await service.get_candles(
+        "BTCUSDT", "1m", start, start + timedelta(minutes=2)
+    )
 
     assert result == cached
     assert provider.calls == 0
     assert repository.commits == 0
+
+
+@pytest.mark.anyio
+async def test_oanda_cache_allows_weekend_boundary_gap() -> None:
+    start = datetime(2024, 6, 1, 0, 0, tzinfo=UTC)
+    first_market_candle = start + timedelta(days=1, hours=22)
+    end = first_market_candle + timedelta(minutes=2)
+    cached = [
+        make_candle(first_market_candle),
+        make_candle(first_market_candle + timedelta(minutes=1)),
+    ]
+    repository = FakeRepository(cached)
+    provider = FakeProvider([], exchange="oanda")
+    service = CandleStorageService(repository, provider)
+
+    result = await service.get_candles("XAUUSD", "1m", start, end)
+
+    assert result == cached
+    assert provider.calls == 0
 
 
 @pytest.mark.anyio
@@ -109,7 +137,9 @@ async def test_fetches_partial_range_and_deduplicates_before_upsert() -> None:
     provider = FakeProvider([first, second, duplicate_second])
     service = CandleStorageService(repository, provider)
 
-    result = await service.get_candles("BTCUSDT", "1m", start, start + timedelta(minutes=2))
+    result = await service.get_candles(
+        "BTCUSDT", "1m", start, start + timedelta(minutes=2)
+    )
 
     assert provider.calls == 1
     assert len(repository.upserted) == 2

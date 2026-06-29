@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -21,6 +21,17 @@ OANDA_TIMEFRAMES = {
     "1d": "D",
     "1w": "W",
 }
+OANDA_TIMEFRAME_DURATION = {
+    "1m": timedelta(minutes=1),
+    "5m": timedelta(minutes=5),
+    "15m": timedelta(minutes=15),
+    "30m": timedelta(minutes=30),
+    "1h": timedelta(hours=1),
+    "4h": timedelta(hours=4),
+    "1d": timedelta(days=1),
+    "1w": timedelta(weeks=1),
+}
+OANDA_MAX_CANDLES_PER_REQUEST = 5000
 OANDA_SYMBOL_MAP = {
     "XAUUSD": "XAU_USD",
     "SP500": "SPX500_USD",
@@ -53,29 +64,58 @@ class OandaMarketDataProvider:
         client: httpx.AsyncClient | None = None,
         timeout: float = 10.0,
     ) -> None:
-        self.api_token = api_token if api_token is not None else settings.oanda_api_token
-        self.account_id = account_id if account_id is not None else settings.oanda_account_id
-        self.environment = environment if environment is not None else settings.oanda_environment
-        self.base_url = (base_url or self._base_url_for_environment(self.environment)).rstrip("/")
+        self.api_token = (
+            api_token if api_token is not None else settings.oanda_api_token
+        )
+        self.account_id = (
+            account_id if account_id is not None else settings.oanda_account_id
+        )
+        self.environment = (
+            environment if environment is not None else settings.oanda_environment
+        )
+        self.base_url = (
+            base_url or self._base_url_for_environment(self.environment)
+        ).rstrip("/")
         self._client = client
         self._timeout = timeout
 
     async def get_symbols(self) -> list[MarketSymbol]:
         if not self.account_id:
             return [
-                MarketSymbol(exchange="oanda", symbol="XAUUSD", base_asset="XAU", quote_asset="USD"),
-                MarketSymbol(exchange="oanda", symbol="SP500", base_asset="SP500", quote_asset="USD"),
-                MarketSymbol(exchange="oanda", symbol="US100", base_asset="US100", quote_asset="USD"),
+                MarketSymbol(
+                    exchange="oanda",
+                    symbol="XAUUSD",
+                    base_asset="XAU",
+                    quote_asset="USD",
+                ),
+                MarketSymbol(
+                    exchange="oanda",
+                    symbol="SP500",
+                    base_asset="SP500",
+                    quote_asset="USD",
+                ),
+                MarketSymbol(
+                    exchange="oanda",
+                    symbol="US100",
+                    base_asset="US100",
+                    quote_asset="USD",
+                ),
             ]
 
         payload = await self._get_json(f"/v3/accounts/{self.account_id}/instruments")
         instruments = payload.get("instruments")
         if not isinstance(instruments, list):
-            raise OandaAdapterError("Oanda instruments response is missing instruments.")
+            raise OandaAdapterError(
+                "Oanda instruments response is missing instruments."
+            )
 
         symbols: list[MarketSymbol] = []
         for instrument in instruments:
-            if not isinstance(instrument, dict) or instrument.get("type") not in {"CFD", "METAL", "CURRENCY"}:
+            if not isinstance(instrument, dict) or instrument.get("type") not in {
+                "CFD",
+                "METAL",
+                "CURRENCY",
+            }:
                 continue
             name = str(instrument["name"])
             display_name = self._to_internal_symbol(name)
@@ -102,20 +142,32 @@ class OandaMarketDataProvider:
         self._validate_time_range(start, end)
 
         instrument = self._to_oanda_instrument(symbol)
-        payload = await self._get_json(
-            f"/v3/instruments/{instrument}/candles",
-            params={
-                "from": self._to_oanda_time(start),
-                "to": self._to_oanda_time(end),
-                "granularity": OANDA_TIMEFRAMES[timeframe],
-                "price": "M",
-            },
+        chunk_duration = OANDA_TIMEFRAME_DURATION[timeframe] * (
+            OANDA_MAX_CANDLES_PER_REQUEST - 1
         )
-        candles = payload.get("candles")
-        if not isinstance(candles, list):
-            raise OandaAdapterError("Oanda candles response is missing candles.")
+        cursor = start
+        normalized: dict[datetime, Candle] = {}
+        while cursor < end:
+            chunk_end = min(cursor + chunk_duration, end)
+            payload = await self._get_json(
+                f"/v3/instruments/{instrument}/candles",
+                params={
+                    "from": self._to_oanda_time(cursor),
+                    "to": self._to_oanda_time(chunk_end),
+                    "granularity": OANDA_TIMEFRAMES[timeframe],
+                    "price": "M",
+                },
+            )
+            candles = payload.get("candles")
+            if not isinstance(candles, list):
+                raise OandaAdapterError("Oanda candles response is missing candles.")
+            for candle in candles:
+                if candle.get("complete"):
+                    parsed = self._parse_candle(symbol.upper(), timeframe, candle)
+                    normalized[parsed.timestamp] = parsed
+            cursor = chunk_end
 
-        return [self._parse_candle(symbol.upper(), timeframe, candle) for candle in candles if candle.get("complete")]
+        return sorted(normalized.values(), key=lambda candle: candle.timestamp)
 
     async def get_latest_price(self, symbol: str) -> LatestPrice:
         candles = await self.get_historical_candles(
@@ -127,14 +179,20 @@ class OandaMarketDataProvider:
         if not candles:
             raise OandaAdapterError("Oanda returned no latest candle for price.")
         latest = candles[-1]
-        return LatestPrice(symbol=latest.symbol, timestamp=latest.timestamp, price=latest.close)
+        return LatestPrice(
+            symbol=latest.symbol, timestamp=latest.timestamp, price=latest.close
+        )
 
     async def _get_json(self, path: str, params: dict[str, Any] | None = None) -> Any:
         if not self.api_token:
-            raise OandaConfigurationError("OANDA_API_TOKEN is required for Oanda market data.")
+            raise OandaConfigurationError(
+                "OANDA_API_TOKEN is required for Oanda market data."
+            )
 
         close_client = self._client is None
-        client = self._client or httpx.AsyncClient(base_url=self.base_url, timeout=self._timeout)
+        client = self._client or httpx.AsyncClient(
+            base_url=self.base_url, timeout=self._timeout
+        )
         try:
             response = await client.get(
                 path,
@@ -145,7 +203,9 @@ class OandaMarketDataProvider:
                 },
             )
         except httpx.HTTPError as exc:
-            raise OandaAdapterError(f"Oanda request failed: {exc.__class__.__name__}") from exc
+            raise OandaAdapterError(
+                f"Oanda request failed: {exc.__class__.__name__}"
+            ) from exc
         finally:
             if close_client:
                 await client.aclose()
@@ -168,7 +228,9 @@ class OandaMarketDataProvider:
         return Candle(
             symbol=symbol,
             timeframe=timeframe,
-            timestamp=datetime.fromisoformat(str(payload["time"]).replace("Z", "+00:00")),
+            timestamp=datetime.fromisoformat(
+                str(payload["time"]).replace("Z", "+00:00")
+            ),
             open=Decimal(str(mid["o"])),
             high=Decimal(str(mid["h"])),
             low=Decimal(str(mid["l"])),
