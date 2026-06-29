@@ -1,7 +1,9 @@
 import asyncio
 import threading
 
+import pytest
 from fastapi.testclient import TestClient
+from starlette.websockets import WebSocketDisconnect
 
 from app.api.routes import market_websocket as market_websocket_routes
 from app.main import app
@@ -132,3 +134,53 @@ def test_market_websocket_replaces_active_subscription(monkeypatch) -> None:
     assert [item.symbol for item in hub.subscriptions] == ["BTCUSDT", "ETHUSDT"]
     assert hub.wait_for_unsubscriptions(2)
     assert [item.symbol for item in hub.unsubscriptions] == ["BTCUSDT", "ETHUSDT"]
+
+
+def test_market_websocket_does_not_duplicate_same_subscription(monkeypatch) -> None:
+    hub = FakeMarketStreamHub()
+    monkeypatch.setattr(market_websocket_routes, "market_stream_hub", hub)
+
+    with client.websocket_connect("/ws/market") as websocket:
+        subscription = {"type": "subscribe", "symbol": "BTCUSDT", "timeframe": "1m"}
+        websocket.send_json(subscription)
+        assert websocket.receive_json()["type"] == "subscribed"
+
+        websocket.send_json(subscription)
+        assert websocket.receive_json()["type"] == "subscribed"
+
+    assert len(hub.subscriptions) == 1
+    assert hub.wait_for_unsubscriptions(1)
+
+
+def test_market_websocket_heartbeat_accepts_matching_pong(monkeypatch) -> None:
+    monkeypatch.setattr(
+        market_websocket_routes.settings, "market_ws_heartbeat_seconds", 0.01
+    )
+    monkeypatch.setattr(
+        market_websocket_routes.settings, "market_ws_stale_seconds", 0.2
+    )
+
+    with client.websocket_connect("/ws/market") as websocket:
+        first_heartbeat = websocket.receive_json()
+        assert first_heartbeat["type"] == "heartbeat"
+        websocket.send_json({"type": "pong", "id": first_heartbeat["id"]})
+
+        second_heartbeat = websocket.receive_json()
+        assert second_heartbeat["type"] == "heartbeat"
+        assert second_heartbeat["id"] > first_heartbeat["id"]
+
+
+def test_market_websocket_closes_stale_client(monkeypatch) -> None:
+    monkeypatch.setattr(
+        market_websocket_routes.settings, "market_ws_heartbeat_seconds", 0.01
+    )
+    monkeypatch.setattr(
+        market_websocket_routes.settings, "market_ws_stale_seconds", 0.025
+    )
+
+    with pytest.raises(WebSocketDisconnect) as disconnect:
+        with client.websocket_connect("/ws/market") as websocket:
+            while True:
+                websocket.receive_json()
+
+    assert disconnect.value.code == 1001

@@ -28,6 +28,17 @@ class MarketSubscribed(BaseModel):
     mock: Literal[False] = False
 
 
+class MarketPong(BaseModel):
+    type: Literal["pong"]
+    id: int = Field(ge=1)
+
+
+class MarketHeartbeat(BaseModel):
+    type: Literal["heartbeat"] = "heartbeat"
+    id: int = Field(ge=1)
+    timestamp: datetime
+
+
 class MarketCandleUpdate(BaseModel):
     type: Literal["candle"] = "candle"
     symbol: str

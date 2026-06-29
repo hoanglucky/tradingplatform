@@ -68,6 +68,10 @@ Day 7 adds these tables:
 - `watchlists`
 - `watchlist_items`
 
+The `users` table stores the single local MVP identity used before authentication exists. `get_mvp_user` inserts `MVP_USER_EMAIL` with PostgreSQL conflict handling, so repeated requests resolve the same row instead of creating duplicates.
+
+The default watchlist uses `MVP_WATCHLIST_NAME`. Repository inserts target `uq_watchlists_user_name` and `uq_watchlist_items_watchlist_symbol`, making lazy creation and item addition idempotent under concurrent requests.
+
 Important constraints and indexes:
 
 - `users.email` is unique and indexed.

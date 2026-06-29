@@ -8,7 +8,7 @@ Live real-money trading is intentionally out of scope for this scaffold. Exchang
 
 ## Implementation Status
 
-Current scaffold status as of 2026-06-23:
+Current scaffold status as of 2026-06-29:
 
 - Monorepo structure has been created.
 - Next.js frontend scaffold exists in `apps/web`.
@@ -27,7 +27,15 @@ Open architecture work:
 
 - Define durable event schemas.
 - Decide whether Redis pub/sub is enough for MVP or if a durable queue is needed.
-- Add authentication and authorization boundaries before user-specific data is introduced.
+- Replace MVP identity with authentication and authorization before public or multi-user deployment.
+
+## MVP Identity
+
+The local MVP uses one configured PostgreSQL user resolved through `get_mvp_user`. The dependency performs an idempotent insert by email and is the only identity source intended for watchlist and settings routes until authentication is implemented. `GET /users/me` exposes the resolved local identity for development diagnostics.
+
+The watchlist API resolves that dependency on every request and lazily creates one named watchlist per user. PostgreSQL uniqueness constraints and conflict-safe inserts enforce one watchlist name per user and one occurrence of each symbol per watchlist. API responses join catalog symbol metadata for direct frontend rendering.
+
+MVP user mode is not an authentication system: there are no credentials, sessions, roles, permissions, or tenant boundaries. It must be disabled and replaced with authenticated request identity before public or multi-user deployment.
 
 ## Components
 
@@ -67,8 +75,11 @@ The Day 21 WebSocket path is intentionally isolated from exchange execution:
 5. `MarketStreamHub` creates one Binance public kline connection for each active symbol/timeframe.
 6. Binance payloads are validated and normalized into the internal OHLCV candle contract.
 7. A bounded queue broadcasts each update to all matching frontend clients.
-8. The same client connection can replace its subscription or recover from an invalid message.
-9. The final unsubscribe cancels the upstream task; transient upstream failures trigger bounded exponential-backoff reconnects.
+8. The chart replaces an epoch-matched last candle or appends a strictly newer candle.
+9. A symbol/timeframe change closes the frontend socket before opening a new subscription.
+10. The API sends heartbeat ids and closes clients that do not return matching pong messages before the stale timeout.
+11. Unexpected frontend disconnects retry with bounded exponential backoff; each new socket sends one subscription.
+12. The final unsubscribe cancels the upstream task; transient upstream failures trigger bounded exponential-backoff reconnects.
 
 The source uses Binance's market-data-only `data-stream.binance.vision` endpoint. The WebSocket contract has no account, order, or exchange-write capability. Oanda-only symbols require a separate future realtime source.
 

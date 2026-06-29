@@ -147,15 +147,101 @@ Verified:
 
 ## Next task candidate
 
-### Day 23 - Frontend WebSocket subscription
+### Day 28 - Watchlist frontend
 
 Suggested scope:
 
-- Connect the chart workspace to `/ws/market`.
-- Subscribe whenever the selected symbol or timeframe changes.
-- Update or append realtime candles and clean up sockets on unmount.
+- Add a dashboard watchlist panel backed by `GET /watchlist`.
+- Add symbol selection, add action, and remove controls.
+- Show loading, empty, and error states and refresh after mutations.
 
 ## Recently completed
+
+### Day 27 - Watchlist API
+
+Implemented:
+
+- Added GET, add-item, and delete-item watchlist endpoints.
+- Reused the Day 26 MVP user dependency for ownership.
+- Added lazy conflict-safe default watchlist creation.
+- Added active symbol validation and uppercase normalization.
+- Added conflict-safe item insertion with duplicate `409` responses.
+- Added joined symbol metadata in list responses.
+
+Verified:
+
+- `npm run lint:api` passes.
+- `npm run api-test` passes all 33 backend tests.
+- Live CRUD smoke test returns GET 200, add 201, duplicate 409, and delete 204.
+
+### Day 26 - Mock user mode
+
+Implemented:
+
+- Added configurable single-user MVP identity settings.
+- Added conflict-safe, idempotent PostgreSQL user creation.
+- Added reusable `get_mvp_user` dependency for watchlist and settings routes.
+- Added `GET /users/me` with explicit `mvp_local` mode.
+- Added a disabled-mode failure path instead of pretending authentication exists.
+
+Verified:
+
+- `npm run lint:api` passes.
+- `npm run api-test` passes all 27 backend tests.
+- `npm run web-test` passes.
+- Two live `/users/me` requests return HTTP 200 and the same UUID.
+
+### Day 25 - Realtime tests
+
+Implemented:
+
+- Added independent tests for updating an existing candle and appending a new candle.
+- Added stale older-candle and duplicate-timestamp regression coverage.
+- Added empty-chart initialization coverage.
+- Confirmed merge operations do not mutate historical input candles.
+- Retained validation, reconnect-backoff, and heartbeat-pong coverage.
+
+Verified:
+
+- Nine frontend market-stream tests pass.
+- `npm run web-test` passes lint, tests, typecheck, and production build.
+
+### Day 24 - Reconnect and heartbeat
+
+Implemented:
+
+- Added frontend reconnect with bounded exponential backoff.
+- Added one-subscription-per-socket guards and idempotent backend subscriptions.
+- Added application heartbeat and matching pong contracts.
+- Added stale-client close and subscription cleanup.
+- Added clear realtime, connecting, retrying, upstream reconnecting, unavailable, and historical-only UI states.
+- Added configurable frontend retry and backend heartbeat/stale intervals.
+
+Verified:
+
+- Six frontend market-stream tests pass.
+- `npm run web-test` passes lint, tests, typecheck, and production build.
+- `npm run lint:api` passes.
+- `npm run api-test` passes all 23 backend tests.
+- Live smoke test receives a Binance candle, heartbeat, and sends pong successfully.
+
+### Day 23 - Frontend WebSocket subscription
+
+Implemented:
+
+- Connected Binance chart selections to `WS /ws/market` after historical loading.
+- Added strict realtime candle normalization and OHLCV validation.
+- Updated matching epochs and appended only strictly newer candles.
+- Added stale-message guards and socket cleanup for selection, refresh, and unmount.
+- Kept Oanda-only selections on historical HTTP data.
+- Kept the Lightweight Charts instance stable while realtime data changes.
+
+Verified:
+
+- Four frontend market-stream tests pass.
+- `npm run web-test` passes lint, tests, typecheck, and production build.
+- Web, API, and market-data health requests return HTTP 200.
+- Live WebSocket smoke test receives a real Binance BTCUSDT candle.
 
 ### Day 22 - Real market stream service
 

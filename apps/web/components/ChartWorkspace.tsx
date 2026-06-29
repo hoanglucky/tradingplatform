@@ -2,10 +2,25 @@
 
 import type { Candle } from "@trading-framework/shared";
 import { RefreshCw } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import {
+  createHeartbeatPong,
+  getReconnectDelay,
+  mergeRealtimeCandle,
+  normalizeRealtimeCandle,
+} from "../lib/market-stream";
 import { CandlestickChart } from "./CandlestickChart";
 
 const marketDataBaseUrl = process.env.NEXT_PUBLIC_MARKET_DATA_BASE_URL ?? "http://localhost:8101";
+const marketWebSocketUrl = process.env.NEXT_PUBLIC_MARKET_WS_URL ?? "ws://localhost:8000/ws/market";
+
+function positiveNumber(value: string | undefined, fallback: number): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+const reconnectBaseMs = positiveNumber(process.env.NEXT_PUBLIC_MARKET_WS_RECONNECT_MS, 1000);
+const reconnectMaxMs = positiveNumber(process.env.NEXT_PUBLIC_MARKET_WS_MAX_RECONNECT_MS, 15000);
 
 const SYMBOLS = [
   { value: "BTCUSDT", label: "BTC / USDT", provider: "Binance" },
@@ -18,6 +33,13 @@ const SYMBOLS = [
 
 const TIMEFRAMES = ["1m", "5m", "15m", "1h", "4h", "1d"] as const;
 type Timeframe = (typeof TIMEFRAMES)[number];
+type RealtimeStatus =
+  | "disabled"
+  | "connecting"
+  | "connected"
+  | "reconnecting"
+  | "source-reconnecting"
+  | "error";
 
 const TIMEFRAME_SECONDS: Record<Timeframe, number> = {
   "1m": 60,
@@ -68,6 +90,23 @@ function normalizeCandles(payload: unknown): Candle[] {
   });
 }
 
+function getRealtimeStatusLabel(status: RealtimeStatus, retryDelayMs: number | null): string {
+  switch (status) {
+    case "disabled":
+      return "Historical data";
+    case "connected":
+      return "Realtime";
+    case "reconnecting":
+      return retryDelayMs ? `Retrying in ${Math.ceil(retryDelayMs / 1000)}s` : "Reconnecting";
+    case "source-reconnecting":
+      return "Market source reconnecting";
+    case "error":
+      return "Stream unavailable";
+    default:
+      return "Connecting stream";
+  }
+}
+
 async function getErrorMessage(response: Response): Promise<string> {
   try {
     const payload = (await response.json()) as { detail?: unknown };
@@ -88,6 +127,9 @@ export function ChartWorkspace() {
   const [error, setError] = useState<string | null>(null);
   const [refreshVersion, setRefreshVersion] = useState(0);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [realtimeStatus, setRealtimeStatus] = useState<RealtimeStatus>("connecting");
+  const [retryDelayMs, setRetryDelayMs] = useState<number | null>(null);
+  const connectionVersionRef = useRef(0);
   const selectedSymbol = SYMBOLS.find((item) => item.value === symbol) ?? SYMBOLS[0];
   const latest = candles.at(-1)?.close;
   const first = candles[0]?.open;
@@ -135,7 +177,125 @@ export function ChartWorkspace() {
     return () => controller.abort();
   }, [refreshVersion, symbol, timeframe]);
 
+  useEffect(() => {
+    const connectionVersion = ++connectionVersionRef.current;
+    if (selectedSymbol.provider !== "Binance") {
+      return;
+    }
+    if (loading) {
+      return;
+    }
+
+    let disposed = false;
+    let socket: WebSocket | null = null;
+    let reconnectTimer: number | null = null;
+    let reconnectAttempt = 0;
+
+    function isCurrentConnection() {
+      return !disposed && connectionVersionRef.current === connectionVersion;
+    }
+
+    function scheduleReconnect() {
+      if (!isCurrentConnection() || reconnectTimer !== null) {
+        return;
+      }
+      const delay = getReconnectDelay(reconnectAttempt, reconnectBaseMs, reconnectMaxMs);
+      reconnectAttempt += 1;
+      setRealtimeStatus("reconnecting");
+      setRetryDelayMs(delay);
+      reconnectTimer = window.setTimeout(() => {
+        reconnectTimer = null;
+        if (!isCurrentConnection()) {
+          return;
+        }
+        setRealtimeStatus("connecting");
+        setRetryDelayMs(null);
+        connect();
+      }, delay);
+    }
+
+    function connect() {
+      if (!isCurrentConnection()) {
+        return;
+      }
+      let activeSocket: WebSocket;
+      try {
+        activeSocket = new WebSocket(marketWebSocketUrl);
+      } catch {
+        window.setTimeout(scheduleReconnect, 0);
+        return;
+      }
+      socket = activeSocket;
+      let subscriptionSent = false;
+
+      activeSocket.addEventListener("open", () => {
+        if (!isCurrentConnection() || subscriptionSent) {
+          return;
+        }
+        subscriptionSent = true;
+        activeSocket.send(JSON.stringify({ type: "subscribe", symbol, timeframe }));
+      });
+      activeSocket.addEventListener("message", (event) => {
+        if (!isCurrentConnection()) {
+          return;
+        }
+        try {
+          const payload = JSON.parse(String(event.data)) as { type?: unknown; code?: unknown };
+          const pong = createHeartbeatPong(payload);
+          if (pong) {
+            activeSocket.send(JSON.stringify(pong));
+            return;
+          }
+          if (payload.type === "subscribed") {
+            reconnectAttempt = 0;
+            setRetryDelayMs(null);
+            setRealtimeStatus("connected");
+            return;
+          }
+          if (payload.type === "error") {
+            setRealtimeStatus(payload.code === "market_stream_reconnecting" ? "source-reconnecting" : "error");
+            return;
+          }
+          const candle = normalizeRealtimeCandle(payload, symbol, timeframe);
+          if (candle) {
+            setCandles((current) => mergeRealtimeCandle(current, candle));
+            setError(null);
+            setLastUpdated(new Date());
+            setRealtimeStatus("connected");
+          }
+        } catch {
+          setRealtimeStatus("error");
+        }
+      });
+      activeSocket.addEventListener("error", () => {
+        if (isCurrentConnection()) {
+          activeSocket.close();
+        }
+      });
+      activeSocket.addEventListener("close", () => {
+        if (isCurrentConnection()) {
+          scheduleReconnect();
+        }
+      });
+    }
+
+    connect();
+
+    return () => {
+      disposed = true;
+      connectionVersionRef.current += 1;
+      if (reconnectTimer !== null) {
+        window.clearTimeout(reconnectTimer);
+      }
+      socket?.close(1000, "Subscription changed");
+    };
+  }, [loading, selectedSymbol.provider, symbol, timeframe]);
+
   function selectSymbol(nextSymbol: string) {
+    connectionVersionRef.current += 1;
+    const nextProvider = SYMBOLS.find((item) => item.value === nextSymbol)?.provider;
+    setRealtimeStatus(nextProvider === "Binance" ? "connecting" : "disabled");
+    setRetryDelayMs(null);
     setCandles([]);
     setLastUpdated(null);
     setSymbol(nextSymbol);
@@ -145,6 +305,9 @@ export function ChartWorkspace() {
     if (nextTimeframe === timeframe) {
       return;
     }
+    connectionVersionRef.current += 1;
+    setRealtimeStatus(selectedSymbol.provider === "Binance" ? "connecting" : "disabled");
+    setRetryDelayMs(null);
     setCandles([]);
     setLastUpdated(null);
     setTimeframe(nextTimeframe);
@@ -195,7 +358,13 @@ export function ChartWorkspace() {
             aria-label="Refresh candles"
             title="Refresh candles"
             disabled={loading}
-            onClick={() => setRefreshVersion((version) => version + 1)}
+            onClick={() => {
+              if (selectedSymbol.provider === "Binance") {
+                setRealtimeStatus("connecting");
+                setRetryDelayMs(null);
+              }
+              setRefreshVersion((version) => version + 1);
+            }}
           >
             <RefreshCw className={loading ? "is-spinning" : undefined} aria-hidden="true" size={17} />
           </button>
@@ -211,8 +380,17 @@ export function ChartWorkspace() {
             </h2>
           </div>
           <div className="chart-data-meta">
-            <span className={`data-status ${error ? "is-error" : loading ? "is-loading" : "is-live"}`} aria-live="polite">
-              {error ? "Unavailable" : loading ? (candles.length > 0 ? "Refreshing" : "Loading") : "Live data"}
+            <span
+              className={`data-status ${error || realtimeStatus === "error" ? "is-error" : realtimeStatus === "connected" ? "is-live" : "is-loading"}`}
+              aria-live="polite"
+            >
+              {error
+                ? "Unavailable"
+                : loading
+                  ? candles.length > 0
+                    ? "Refreshing"
+                    : "Loading"
+                  : getRealtimeStatusLabel(realtimeStatus, retryDelayMs)}
             </span>
             <small>{lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "Awaiting data"}</small>
           </div>

@@ -151,11 +151,25 @@ Current core endpoints:
 - `POST /symbols`
 - `PATCH /symbols/{symbol_id}`
 - `DELETE /symbols/{symbol_id}`
+- `GET /users/me`
+- `GET /watchlist`
+- `POST /watchlist/items`
+- `DELETE /watchlist/items/{symbol}`
 - `WS /ws/market`
 
 See [docs/api.md](docs/api.md) for request and response details.
 
-The market WebSocket accepts symbol/timeframe subscriptions and broadcasts normalized candles from Binance's public market-data-only kline stream. It shares one upstream connection per active symbol/timeframe and reconnects automatically after transient disconnects. No API key is required.
+The market WebSocket accepts symbol/timeframe subscriptions and broadcasts normalized candles from Binance's public market-data-only kline stream. It shares one upstream connection per active symbol/timeframe, sends application heartbeats, removes stale clients, and reconnects upstream automatically after transient disconnects. Duplicate subscriptions are idempotent. No API key is required.
+
+## MVP User Mode
+
+Local development uses one database-backed identity configured with `MVP_USER_EMAIL` and `MVP_USER_DISPLAY_NAME`. `GET /users/me` creates it on first use with a conflict-safe insert and returns `mode: mvp_local`. Upcoming watchlist and settings endpoints use the same `get_mvp_user` dependency.
+
+This is not authentication. It has no password, session, access control, or multi-user isolation. Set `MVP_USER_MODE=false` to disable the fallback; real authentication is required before multi-user or public deployment.
+
+## Watchlist API
+
+The default MVP user owns one watchlist configured with `MVP_WATCHLIST_NAME`. `GET /watchlist` creates it on first use, `POST /watchlist/items` adds an active catalog symbol, and `DELETE /watchlist/items/{symbol}` removes it. Symbols are normalized to uppercase and duplicate additions return HTTP `409`.
 
 ## Market Data Contracts
 
@@ -182,11 +196,13 @@ See [docs/market-data.md](docs/market-data.md) for market-data service details.
 
 ## Chart Workspace
 
-The chart workspace is available at `/dashboard/chart`. It uses a reusable `CandlestickChart` component and fetches read-only candles from `GET /market/candles` whenever the selected symbol or timeframe changes. API Decimal values are normalized to numbers before rendering. The responsive market header shows the latest close and update status, and its refresh button reloads the current selection without changing chart settings.
+The chart workspace is available at `/dashboard/chart`. It fetches read-only history from `GET /market/candles`, then subscribes Binance selections to `WS /ws/market`. Realtime bars update an epoch-matched candle or append a newer candle without duplication, while the chart instance remains stable between ticks. Selection changes, refreshes, and unmounts close stale sockets. Unexpected disconnects retry with bounded exponential backoff, heartbeat messages receive pong replies, and the UI exposes connection state. Oanda-only symbols currently remain historical-only.
+
+The frontend realtime test suite covers existing-bar updates, new-bar appends, stale updates, duplicate timestamps, empty chart state, validation, reconnect backoff, and heartbeat pong messages. Run it through `npm run web-test`.
 
 ## Next Milestones
 
-1. Connect the chart workspace to realtime candle updates.
+1. Build the frontend watchlist panel.
 2. Add an Oanda-compatible realtime path for non-Binance symbols.
 3. Add durable event contracts between services.
 4. Build paper order lifecycle and portfolio accounting.

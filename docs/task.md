@@ -29,18 +29,18 @@
 
 ## Current review task
 
-Review the Day 22 realtime market stream service.
+Review the Day 27 watchlist API.
 
 Focus areas:
 
-- Confirm the source connects only to Binance's public market-data WebSocket.
-- Confirm Binance kline payloads normalize into validated OHLCV candle messages.
-- Confirm clients with the same symbol/timeframe share one upstream stream.
-- Confirm normalized updates broadcast to every matching client queue.
-- Confirm slow-client queues remain bounded and retain recent updates.
-- Confirm transient disconnects emit a reconnecting event and use bounded backoff.
-- Confirm the final unsubscribe cancels the upstream stream task.
-- Confirm resubscribe and client disconnect cleanup release old subscriptions.
+- Confirm all watchlist routes resolve ownership through `get_mvp_user`.
+- Confirm the configured default watchlist is created idempotently.
+- Confirm GET returns watchlist metadata and joined symbol details.
+- Confirm POST normalizes symbol case and requires an active catalog symbol.
+- Confirm duplicate item insertion returns `409` without duplicate rows.
+- Confirm DELETE handles lowercase paths and returns `204` on success.
+- Confirm missing catalog symbols and missing items return distinct `404` responses.
+- Confirm tests isolate temporary users and do not modify the local MVP watchlist.
 - Confirm no live trading or exchange write behavior was added.
 
 ## Verification commands

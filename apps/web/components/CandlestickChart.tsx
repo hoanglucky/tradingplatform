@@ -7,6 +7,8 @@ import {
   ColorType,
   createChart,
   type CandlestickData,
+  type IChartApi,
+  type ISeriesApi,
   type UTCTimestamp,
 } from "lightweight-charts";
 
@@ -41,12 +43,15 @@ export function CandlestickChart({
   error,
 }: CandlestickChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<IChartApi | null>(null);
+  const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const fitContentRef = useRef(false);
   const chartHeight = Math.max(height, 240);
+  const hasData = candles.length > 0;
 
   useEffect(() => {
     const container = containerRef.current;
-    const data = toChartData(candles);
-    if (!container || loading || error || data.length === 0) {
+    if (!container || loading || error || !hasData) {
       return;
     }
 
@@ -82,8 +87,9 @@ export function CandlestickChart({
       wickUpColor: "#0d9488",
       wickDownColor: "#dc4c3f",
     });
-    series.setData(data);
-    chart.timeScale().fitContent();
+    chartRef.current = chart;
+    seriesRef.current = series;
+    fitContentRef.current = true;
 
     const resizeObserver = new ResizeObserver(([entry]) => {
       chart.applyOptions({ width: Math.floor(entry.contentRect.width) });
@@ -91,10 +97,23 @@ export function CandlestickChart({
     resizeObserver.observe(container);
 
     return () => {
+      chartRef.current = null;
+      seriesRef.current = null;
+      fitContentRef.current = false;
       resizeObserver.disconnect();
       chart.remove();
     };
-  }, [candles, chartHeight, error, loading]);
+  }, [chartHeight, error, hasData, loading]);
+
+  useEffect(() => {
+    if (!loading && !error && seriesRef.current) {
+      seriesRef.current.setData(toChartData(candles));
+      if (fitContentRef.current) {
+        chartRef.current?.timeScale().fitContent();
+        fitContentRef.current = false;
+      }
+    }
+  }, [candles, error, loading]);
 
   if (loading) {
     return (

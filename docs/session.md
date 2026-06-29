@@ -1010,3 +1010,164 @@ Implement Day 22.
 - The Binance source uses the public market-data-only endpoint and needs no API key.
 - No account stream, order endpoint, live trading, or exchange write behavior was added.
 - Oanda-only symbols are not yet supported by the realtime stream.
+
+## 2026-06-29 - Day 23 Frontend WebSocket Subscription
+
+### User request
+
+Implement Day 23.
+
+### Work completed
+
+- Added `NEXT_PUBLIC_MARKET_WS_URL` frontend configuration.
+- Connected Binance chart selections to `WS /ws/market` after historical candles load.
+- Added strict realtime candle normalization and OHLCV validation.
+- Added epoch-based candle merging so equivalent ISO timestamps update one bar.
+- Appended only strictly newer candles and ignored stale unknown updates.
+- Limited retained realtime history to 500 candles.
+- Added connection-version guards to prevent stale sockets from mutating new selections.
+- Closed sockets when symbol/timeframe changes, during refresh, and on unmount.
+- Added realtime, connecting, reconnecting, disconnected, unavailable, and historical-only status text.
+- Kept Oanda-only selections on the historical HTTP path.
+- Refactored `CandlestickChart` to preserve its chart instance during realtime updates.
+- Added four frontend tests for normalization, update, append, stale data, and invalid OHLC handling.
+- Updated Makefile and npm web-test commands to include frontend tests.
+- Updated README, architecture, plan, task, and session documentation.
+
+### Verification performed
+
+- `npm run web-test` passed lint, four tests, typecheck, and production build.
+- Next.js production build included `/dashboard/chart`.
+- `GET http://localhost:2000/dashboard/chart` returned HTTP 200.
+- API and market-data health endpoints returned HTTP 200.
+- Live `WS /ws/market` smoke test received a real BTCUSDT candle from Binance.
+
+### Safety notes
+
+- The frontend consumes only public, read-only market data.
+- No account stream, order action, live trading, or exchange write behavior was added.
+- Oanda-only symbols do not open a Binance WebSocket.
+
+## 2026-06-29 - Day 24 Reconnect and Heartbeat
+
+### User request
+
+Implement Day 24.
+
+### Work completed
+
+- Added frontend WebSocket reconnect with bounded exponential backoff.
+- Reset reconnect attempts after a successful subscription acknowledgement.
+- Added retry timer and connection-version cleanup on selection changes, refresh, and unmount.
+- Guarded each socket so it sends at most one subscription.
+- Added explicit frontend retry and upstream reconnect UI states.
+- Added backend heartbeat messages with monotonically increasing ids and UTC timestamps.
+- Added frontend pong replies using the matching heartbeat id.
+- Added backend stale-client detection and close code `1001`.
+- Made repeated identical subscriptions idempotent.
+- Added environment settings for frontend retry and backend heartbeat/stale timing.
+- Added backend tests for heartbeat, stale cleanup, and duplicate subscriptions.
+- Expanded frontend tests for reconnect backoff and heartbeat pong validation.
+- Updated README, API, architecture, plan, task, and session documentation.
+
+### Verification performed
+
+- `npm run lint:api` passed Ruff checks.
+- `npm run api-test` passed all 23 backend tests.
+- `npm run web-test` passed lint, six tests, typecheck, and production build.
+- Live WebSocket smoke test received a BTCUSDT candle and heartbeat, then returned pong.
+- Docker API healthcheck reached `healthy`.
+
+### Safety notes
+
+- Heartbeat and reconnect logic only manage read-only market-data connections.
+- No account stream, order action, live trading, or exchange write behavior was added.
+- Oanda-only symbols remain on historical HTTP data.
+
+## 2026-06-29 - Day 25 Realtime Tests
+
+### User request
+
+Implement Day 25.
+
+### Work completed
+
+- Split candle append and stale-candle behavior into independent tests.
+- Added explicit empty-chart initialization coverage.
+- Added duplicate-timestamp replacement coverage for a multi-candle series.
+- Confirmed duplicate replacement preserves candle order.
+- Confirmed existing-candle updates do not mutate historical input objects.
+- Retained tests for invalid OHLC values, reconnect backoff, and heartbeat pong messages.
+- Updated README, plan, task, Codex task, and session documentation.
+
+### Verification performed
+
+- Nine frontend market-stream tests passed.
+- Required Day 25 cases all have direct regression coverage.
+
+### Safety notes
+
+- Day 25 changes test coverage only and does not add execution behavior.
+- No account stream, order action, live trading, or exchange write behavior was added.
+
+## 2026-06-29 - Day 26 Mock User Mode
+
+### User request
+
+Implement Day 26.
+
+### Work completed
+
+- Added `MVP_USER_MODE`, `MVP_USER_EMAIL`, and `MVP_USER_DISPLAY_NAME` configuration.
+- Added PostgreSQL conflict-safe `UserRepository.get_or_create_by_email`.
+- Added `ensure_mvp_user` and reusable FastAPI `get_mvp_user` dependency.
+- Added `GET /users/me` with explicit `mvp_local` response mode.
+- Added a `503` response when MVP mode is disabled and authentication is unavailable.
+- Added tests for idempotent creation, stable identity, disabled mode, and OpenAPI registration.
+- Documented how Day 27 watchlist and Day 29 settings routes must reuse the dependency.
+- Updated README, API, architecture, database, plan, task, Codex task, and session docs.
+
+### Verification performed
+
+- `npm run lint:api` passed Ruff checks.
+- `npm run api-test` passed all 27 backend tests.
+- `npm run web-test` passed lint, nine tests, typecheck, and production build.
+- Live `GET /users/me` requests returned HTTP 200 twice with the same UUID.
+- The persisted user uses the configured local email and display name.
+
+### Safety notes
+
+- MVP user mode is explicitly not authentication or authorization.
+- No passwords, sessions, roles, permissions, or exchange credentials were added.
+- No live trading or exchange write behavior was added.
+
+## 2026-06-29 - Day 27 Watchlist API
+
+### User request
+
+Implement Day 27.
+
+### Work completed
+
+- Added `MVP_WATCHLIST_NAME` configuration.
+- Added conflict-safe default watchlist creation for the MVP user.
+- Added `GET /watchlist` with joined catalog symbol metadata.
+- Added `POST /watchlist/items` with uppercase normalization and active-symbol validation.
+- Added duplicate item protection with HTTP `409`.
+- Added `DELETE /watchlist/items/{symbol}` with lowercase path support.
+- Added distinct `404` responses for unknown catalog symbols and missing watchlist items.
+- Added repository helpers for watchlist lookup, joins, item insertion, and deletion.
+- Added six API integration tests using isolated temporary MVP users.
+- Updated README, API, architecture, database, plan, task, Codex task, and session docs.
+
+### Verification performed
+
+- `npm run lint:api` passed Ruff checks.
+- `npm run api-test` passed all 33 backend tests.
+- Live CRUD smoke test returned GET `200`, add `201`, duplicate `409`, list `200`, and delete `204`.
+- The live list response included normalized `BTCUSDT` symbol metadata.
+
+### Safety notes
+
+- Watchlist operations only modify local application data for the MVP user.
+- No exchange account, order action, live trading, or exchange write behavior was added.

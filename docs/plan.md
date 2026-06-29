@@ -896,9 +896,13 @@ Requirements:
 
 **Done checklist:**
 
-* [ ] Chart updates realtime
-* [ ] No duplicated candles
-* [ ] Socket cleanup works
+* [x] Chart updates realtime
+* [x] No duplicated candles
+* [x] Socket cleanup works
+
+**Implementation note - 2026-06-29:**
+
+The chart workspace now subscribes to `/ws/market` after its historical Binance candles load. Realtime candles replace an existing epoch-matched bar or append only when newer, preventing duplicates across `Z` and `+00:00` timestamp formats. Selection changes, refreshes, and component unmounts close the old socket. Oanda-only symbols remain on historical HTTP data until a realtime adapter exists.
 
 ---
 
@@ -920,9 +924,13 @@ Add:
 
 **Done checklist:**
 
-* [ ] Reconnect works
-* [ ] Connection status visible
-* [ ] No duplicate subscriptions
+* [x] Reconnect works
+* [x] Connection status visible
+* [x] No duplicate subscriptions
+
+**Implementation note - 2026-06-29:**
+
+The frontend now reconnects closed sockets with exponential backoff bounded between `NEXT_PUBLIC_MARKET_WS_RECONNECT_MS` and `NEXT_PUBLIC_MARKET_WS_MAX_RECONNECT_MS`. The API emits application heartbeat messages, accepts matching pong replies, and closes stale clients after `MARKET_WS_STALE_SECONDS`. The UI distinguishes connecting, retrying, source reconnecting, realtime, unavailable, and historical-only states. Duplicate subscriptions on the same socket are idempotent.
 
 ---
 
@@ -945,8 +953,12 @@ Test cases:
 
 **Done checklist:**
 
-* [ ] Candle update tests pass
-* [ ] Realtime logic stable
+* [x] Candle update tests pass
+* [x] Realtime logic stable
+
+**Implementation note - 2026-06-29:**
+
+The frontend realtime suite now covers updating an existing candle, appending a newer candle, ignoring an unknown older candle, replacing duplicate timestamps without reordering, and initializing an empty chart. It also verifies immutable input behavior, invalid OHLC rejection, bounded reconnect delays, and heartbeat pong creation.
 
 ---
 
@@ -970,9 +982,13 @@ Requirements:
 
 **Done checklist:**
 
-* [ ] Default user exists
-* [ ] Backend can identify MVP user
-* [ ] Docs mention mock user mode
+* [x] Default user exists
+* [x] Backend can identify MVP user
+* [x] Docs mention mock user mode
+
+**Implementation note - 2026-06-29:**
+
+The API now provides an idempotent `get_mvp_user` dependency backed by a PostgreSQL conflict-safe insert. `GET /users/me` creates the configured local user on first use and returns the same identity afterward with `mode: mvp_local`. Watchlist and settings routes will reuse this dependency in Days 27 and 29. This mode has no credentials or authorization and must be replaced before multi-user deployment.
 
 ---
 
@@ -996,9 +1012,13 @@ Rules:
 
 **Done checklist:**
 
-* [ ] Watchlist API works
-* [ ] Duplicate symbol rejected
-* [ ] Tests pass
+* [x] Watchlist API works
+* [x] Duplicate symbol rejected
+* [x] Tests pass
+
+**Implementation note - 2026-06-29:**
+
+The API now exposes `GET /watchlist`, `POST /watchlist/items`, and `DELETE /watchlist/items/{symbol}` for the configured MVP user. The default watchlist and items use PostgreSQL conflict-safe inserts, symbols must exist and be active, input symbols normalize to uppercase, duplicates return `409`, and missing symbols/items return `404`.
 
 ---
 

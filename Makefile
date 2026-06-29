@@ -62,6 +62,7 @@ api-test:
 
 web-test:
 	npm --workspace apps/web run lint
+	npm --workspace apps/web run test
 	npm --workspace apps/web run typecheck
 	npm --workspace apps/web run build
 

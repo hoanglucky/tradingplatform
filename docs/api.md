@@ -163,6 +163,27 @@ It then broadcasts normalized updates from Binance's public kline stream:
 
 Clients may send another valid subscribe message on the same connection. Invalid subscriptions receive an `invalid_subscription` error and can be retried without reconnecting.
 
+The API periodically sends an application heartbeat:
+
+```json
+{
+  "type": "heartbeat",
+  "id": 1,
+  "timestamp": "2026-06-29T04:00:00Z"
+}
+```
+
+Clients must respond with the matching id:
+
+```json
+{
+  "type": "pong",
+  "id": 1
+}
+```
+
+A client that does not return a matching pong before `MARKET_WS_STALE_SECONDS` is closed with WebSocket code `1001`. Sending the same subscription repeatedly only returns another acknowledgement; it does not create a duplicate upstream subscription.
+
 The API shares one upstream Binance connection between clients using the same symbol/timeframe. If Binance disconnects, clients receive a `market_stream_reconnecting` error event while the hub retries with bounded exponential backoff. The queue for each client is bounded; when a client cannot keep up, the oldest pending update is replaced by newer market data.
 
 Current realtime support is for Binance-listed symbols. Oanda-only symbols remain available through the historical candle HTTP endpoint and require a future realtime adapter.
@@ -173,6 +194,10 @@ Configuration:
 BINANCE_WS_BASE_URL=wss://data-stream.binance.vision/ws
 MARKET_STREAM_RECONNECT_SECONDS=1
 MARKET_STREAM_MAX_RECONNECT_SECONDS=30
+MARKET_WS_HEARTBEAT_SECONDS=10
+MARKET_WS_STALE_SECONDS=30
+NEXT_PUBLIC_MARKET_WS_RECONNECT_MS=1000
+NEXT_PUBLIC_MARKET_WS_MAX_RECONNECT_MS=15000
 ```
 
 The Binance stream is public and read-only. No API key, account access, order action, or exchange write operation is used.
@@ -253,6 +278,82 @@ Returns `404` when the symbol does not exist and `409` when the update would dup
 ### `DELETE /symbols/{symbol_id}`
 
 Deletes a symbol. Returns `204` on success or `404` when the symbol does not exist.
+
+## MVP User Endpoint
+
+### `GET /users/me`
+
+Returns the configured single local user. The first request creates the user in PostgreSQL; later requests return the same UUID.
+
+```json
+{
+  "id": "68b41c54-5623-4cdb-81b4-87c64b97b8a1",
+  "email": "local@trading-framework.test",
+  "display_name": "Local Trader",
+  "created_at": "2026-06-29T05:00:00Z",
+  "updated_at": "2026-06-29T05:00:00Z",
+  "mode": "mvp_local"
+}
+```
+
+Configuration:
+
+```env
+MVP_USER_MODE=true
+MVP_USER_EMAIL=local@trading-framework.test
+MVP_USER_DISPLAY_NAME=Local Trader
+```
+
+When `MVP_USER_MODE=false`, the endpoint returns `503` because real authentication is not implemented. This mode has no password, session, authorization, or user isolation. Watchlist and settings APIs use the same `get_mvp_user` dependency, but full authentication is required before exposing user-specific data publicly.
+
+## Watchlist Endpoints
+
+All watchlist endpoints resolve ownership through the MVP user dependency. They are unavailable when `MVP_USER_MODE=false`.
+
+### `GET /watchlist`
+
+Returns the configured user's default watchlist and creates it on first use.
+
+```json
+{
+  "id": "d489db73-5f37-4ced-846a-087c285ab50d",
+  "user_id": "68b41c54-5623-4cdb-81b4-87c64b97b8a1",
+  "name": "Main",
+  "items": [
+    {
+      "id": "f865c561-d747-48d2-bc85-d0c5ae7a2046",
+      "symbol_id": "c2c4e1dd-1c45-47bd-989a-1ad671949933",
+      "exchange": "binance",
+      "symbol": "BTCUSDT",
+      "base_asset": "BTC",
+      "quote_asset": "USDT",
+      "created_at": "2026-06-29T06:00:00Z"
+    }
+  ]
+}
+```
+
+### `POST /watchlist/items`
+
+Adds an active symbol from the catalog. Input is whitespace-trimmed and normalized to uppercase.
+
+```json
+{
+  "symbol": "BTCUSDT"
+}
+```
+
+Returns `201` on success, `404` when the active symbol does not exist, and `409` when it is already in the watchlist.
+
+### `DELETE /watchlist/items/{symbol}`
+
+Removes a symbol and returns `204`. Returns `404` when the active catalog symbol or watchlist item does not exist.
+
+Configuration:
+
+```env
+MVP_WATCHLIST_NAME=Main
+```
 
 ## Market Data Endpoints
 
@@ -347,5 +448,3 @@ apps/api/app/
 ├── main.py
 └── schemas/
 ```
-
-The API currently has no authentication layer. Add auth before introducing user-specific portfolio, watchlist, exchange credential, or account data endpoints.

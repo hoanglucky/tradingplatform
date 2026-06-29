@@ -15,6 +15,14 @@ class SymbolRepository(BaseRepository[Symbol]):
         )
         return result.first()
 
+    async def get_active_by_symbol(self, symbol: str) -> Symbol | None:
+        result = await self.session.scalars(
+            select(Symbol)
+            .where(Symbol.symbol == symbol, Symbol.is_active.is_(True))
+            .order_by(Symbol.exchange)
+        )
+        return result.first()
+
     async def list_active(self, *, limit: int = 100, offset: int = 0) -> list[Symbol]:
         result = await self.session.scalars(
             select(Symbol).where(Symbol.is_active.is_(True)).offset(offset).limit(limit)

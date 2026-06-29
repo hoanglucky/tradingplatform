@@ -1,6 +1,7 @@
 from functools import cached_property
+from typing import Self
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -19,10 +20,28 @@ class Settings(BaseSettings):
     binance_ws_base_url: str = "wss://data-stream.binance.vision/ws"
     market_stream_reconnect_seconds: float = Field(default=1.0, gt=0, le=60)
     market_stream_max_reconnect_seconds: float = Field(default=30.0, gt=0, le=300)
+    market_ws_heartbeat_seconds: float = Field(default=10.0, gt=0, le=60)
+    market_ws_stale_seconds: float = Field(default=30.0, gt=0, le=300)
+    mvp_user_mode: bool = True
+    mvp_user_email: str = Field(
+        default="local@trading-framework.test", min_length=3, max_length=320
+    )
+    mvp_user_display_name: str = Field(
+        default="Local Trader", min_length=1, max_length=120
+    )
+    mvp_watchlist_name: str = Field(default="Main", min_length=1, max_length=120)
     enable_live_trading: bool = False
     enable_exchange_writes: bool = False
     default_trading_mode: str = "paper"
     exchange_adapter_mode: str = "read_only"
+
+    @model_validator(mode="after")
+    def validate_websocket_timing(self) -> Self:
+        if self.market_ws_stale_seconds <= self.market_ws_heartbeat_seconds:
+            raise ValueError(
+                "MARKET_WS_STALE_SECONDS must be greater than MARKET_WS_HEARTBEAT_SECONDS"
+            )
+        return self
 
     @cached_property
     def cors_origins_list(self) -> list[str]:
