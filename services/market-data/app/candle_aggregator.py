@@ -20,8 +20,8 @@ class CandleAggregator:
         as_of: datetime | None = None,
         include_partial: bool = True,
     ) -> list[AggregatedCandle]:
-        ordered = sorted(candles, key=lambda candle: candle.timestamp)
-        if not ordered:
+        received = sorted(candles, key=lambda candle: candle.timestamp)
+        if not received:
             return []
 
         evaluation_time = as_of or datetime.now(UTC)
@@ -29,8 +29,8 @@ class CandleAggregator:
             raise CandleAggregationError("as_of must be timezone-aware.")
         evaluation_time = evaluation_time.astimezone(UTC)
 
-        source_symbol = ordered[0].symbol
-        source_timeframe = parse_timeframe(ordered[0].timeframe)
+        source_symbol = received[0].symbol
+        source_timeframe = parse_timeframe(received[0].timeframe)
         target = parse_timeframe(target_timeframe)
         if target.duration_milliseconds < source_timeframe.duration_milliseconds:
             raise CandleAggregationError(
@@ -40,15 +40,20 @@ class CandleAggregator:
             raise CandleAggregationError(
                 "Target timeframe must be a multiple of the source timeframe."
             )
-        if any(candle.symbol != source_symbol for candle in ordered):
+        if any(candle.symbol != source_symbol for candle in received):
             raise CandleAggregationError("All candles must use the same symbol.")
         if any(
             parse_timeframe(candle.timeframe).value != source_timeframe.value
-            for candle in ordered
+            for candle in received
         ):
             raise CandleAggregationError(
                 "All candles must use the same source timeframe."
             )
+
+        ordered = sorted(
+            {candle.timestamp: candle for candle in received}.values(),
+            key=lambda candle: candle.timestamp,
+        )
 
         buckets: dict[int, list[Candle]] = {}
         for candle in ordered:
@@ -91,6 +96,17 @@ class CandleAggregator:
             closed = bucket_end <= evaluation_time
             if not include_partial and not closed:
                 continue
+            expected_source_count = (
+                int(
+                    (bucket_end - bucket_start).total_seconds()
+                    * 1000
+                    / source_timeframe.duration_milliseconds
+                )
+                if closed
+                else len(bucket)
+            )
+            source_count = len(bucket)
+            missing_source_count = max(0, expected_source_count - source_count)
             aggregated.append(
                 AggregatedCandle(
                     symbol=source_symbol,
@@ -103,6 +119,10 @@ class CandleAggregator:
                     volume=sum((candle.volume for candle in bucket), start=0),
                     closed=closed,
                     partial=not closed,
+                    complete=missing_source_count == 0,
+                    source_count=source_count,
+                    expected_source_count=expected_source_count,
+                    missing_source_count=missing_source_count,
                 )
             )
         return aggregated

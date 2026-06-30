@@ -4,6 +4,7 @@ import {
   DEFAULT_TIMEFRAME_FAVORITES,
   normalizeChartTimeframe,
   parseStoredTimeframeFavorites,
+  realtimeSourceTimeframe,
   sortChartTimeframes,
   supportsRealtimeTimeframe,
 } from "../lib/timeframe-options.ts";
@@ -33,9 +34,13 @@ test("sorts preset and custom favorites by timeframe duration", () => {
   ]);
 });
 
-test("uses polling only when a provider has no direct realtime timeframe", () => {
+test("uses a one-minute live source when a provider has no direct realtime timeframe", () => {
   assert.equal(supportsRealtimeTimeframe("XAUUSD", "3m"), false);
   assert.equal(supportsRealtimeTimeframe("XAUUSD", "5m"), true);
   assert.equal(supportsRealtimeTimeframe("BTCUSDT", "3m"), true);
   assert.equal(supportsRealtimeTimeframe("BTCUSDT", "45m"), false);
+  assert.equal(realtimeSourceTimeframe("XAUUSD", "3m"), "1m");
+  assert.equal(realtimeSourceTimeframe("XAUUSD", "5m"), "1m");
+  assert.equal(realtimeSourceTimeframe("XAUUSD", "1h"), "1m");
+  assert.equal(realtimeSourceTimeframe("BTCUSDT", "45m"), "1m");
 });

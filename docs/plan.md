@@ -1997,9 +1997,18 @@ Test cases:
 - Invalid timeframe.
 Done checklist:
 
-[ ] Edge case tests pass
-[ ] Missing data handled explicitly
-[ ] Duplicate data does not corrupt OHLCV
+[x] Edge case tests pass
+[x] Missing data handled explicitly
+[x] Duplicate data does not corrupt OHLCV
+
+Implementation note — 2026-06-30:
+
+- Aggregation deduplicates source candles by timestamp using the latest received value before OHLCV calculation.
+- Aggregate lifecycle metadata now includes source, expected, and missing counts plus an explicit completeness flag.
+- Missing source intervals are never synthesized; OHLCV remains derived only from observed candles.
+- Active partial buckets avoid false missing warnings solely because their target bucket has not closed.
+- Added coverage for missing candles, duplicates, unsorted input, partial buckets, UTC day boundaries, DST-local input, empty input, and invalid targets.
+- Verification: 98 market-data tests pass.
 Day 30.21 — UX polish for custom timeframe
 Goal: Make custom timeframe understandable to the user.
 
@@ -2018,13 +2027,23 @@ Done checklist:
 
 [x] Source label visible
 [x] Aggregated label visible
-[ ] Partial/missing warning visible
+[x] Partial/missing warning visible
 
 Implementation note — 2026-06-30:
 
 - Favorite timeframe buttons are sorted by normalized duration rather than insertion order.
 - Preset and favorited custom values are merged, deduplicated, and sorted in every chart-window selector.
 - A custom `6m` favorite therefore appears after `5m` and before `15m` in both toolbar and window dropdowns.
+- Added persisted candle quality fields for partial, complete, source, expected, and missing counts.
+- API metadata summarizes partial/incomplete buckets and total missing source candles on both cache misses and hits.
+- Chart windows show `Missing N` or `Partial` warnings with diagnostic tooltips.
+- Trailing partial or incomplete aggregates are no longer trusted as complete cache coverage; they are rebuilt as source candles arrive.
+- Polling custom timeframes request the active bucket through the current minute so M3 continues updating before the bucket closes.
+- Custom timeframes now consume a shared M1 WebSocket source and update their active UTC bucket on every provider event; REST remains the history and resume reconciliation path.
+- One expected open partial candle is hidden while the stream is healthy; genuine missing-source diagnostics remain visible.
+- Oanda direct and custom chart windows share one M1 realtime clock, eliminating independently polled M1/M5 phase drift.
+- Live rendering updates only the final series item when history is unchanged, avoiding a full chart redraw per event.
+- Verification: 99 market-data, 57 API, and 57 frontend tests plus Ruff and production build pass.
 Day 30.22 — Custom timeframe documentation
 Goal: Document how custom timeframe works.
 
@@ -2041,9 +2060,15 @@ Document:
 - Warning that aggregation is not prediction; it is OHLCV resampling.
 Done checklist:
 
-[ ] Architecture docs updated
-[ ] API docs updated
-[ ] Examples included
+[x] Architecture docs updated
+[x] API docs updated
+[x] Examples included
+
+Implementation note — 2026-06-30:
+
+- Updated architecture to match the implemented parser, provider routing, aggregation cache, quality persistence, realtime isolation, and frontend source labels.
+- Documented the `/market/candles` envelope, custom request examples, metadata fields, validation rules, cache-hit behavior, and quality semantics.
+- Explicitly states that aggregation is deterministic OHLCV resampling, not prediction or financial advice.
 Day 30.30 — Structure engine base
 Goal: Create foundation for market structure analysis.
 

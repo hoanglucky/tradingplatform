@@ -58,3 +58,8 @@ export function supportsRealtimeTimeframe(symbol: string, timeframe: string): bo
     timeframe,
   );
 }
+
+export function realtimeSourceTimeframe(symbol: string, timeframe: string): string {
+  if (OANDA_SYMBOLS.has(symbol)) return "1m";
+  return supportsRealtimeTimeframe(symbol, timeframe) ? timeframe : "1m";
+}

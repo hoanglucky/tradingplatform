@@ -33,6 +33,14 @@ test("aligns week ranges to Monday and month ranges to calendar boundaries", () 
   assert.equal(monthly.end.toISOString(), "2026-06-30T12:34:00.000Z");
 });
 
+test("includes the active minute for aggregate polling requests", () => {
+  const now = Date.parse("2026-06-30T15:29:42Z");
+  const request = recentCandleRequest("XAUUSD", "3m", now, 120, true);
+
+  assert.equal(request.start.toISOString(), "2026-06-30T09:27:00.000Z");
+  assert.equal(request.end.toISOString(), "2026-06-30T15:29:00.000Z");
+});
+
 test("fetches and normalizes candles through the shared client", async (context) => {
   const originalFetch = globalThis.fetch;
   context.after(() => {
@@ -95,6 +103,9 @@ test("returns candle source and aggregation metadata", async (context) => {
           base_timeframe: "15m",
           cache_hit: true,
           missing_ranges_fetched: 0,
+          partial_candle_count: 1,
+          incomplete_candle_count: 0,
+          missing_source_candle_count: 0,
         },
       }),
       { headers: { "Content-Type": "application/json" } },
@@ -109,6 +120,7 @@ test("returns candle source and aggregation metadata", async (context) => {
   assert.equal(result.metadata?.aggregation_used, true);
   assert.equal(result.metadata?.base_timeframe, "15m");
   assert.equal(result.metadata?.cache_hit, true);
+  assert.equal(result.metadata?.partial_candle_count, 1);
 });
 
 test("surfaces a provider error without returning partial data", async (context) => {

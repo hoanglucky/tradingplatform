@@ -5,7 +5,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, ForeignKey, Index, Numeric, String, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, Numeric, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -35,5 +35,10 @@ class Candle(UuidPrimaryKeyMixin, TimestampMixin, Base):
     low: Mapped[Decimal] = mapped_column(Numeric(20, 8), nullable=False)
     close: Mapped[Decimal] = mapped_column(Numeric(20, 8), nullable=False)
     volume: Mapped[Decimal] = mapped_column(Numeric(28, 8), nullable=False)
+    partial: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    complete: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    source_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    expected_source_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    missing_source_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     symbol: Mapped["Symbol"] = relationship(back_populates="candles")

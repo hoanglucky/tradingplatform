@@ -23,6 +23,11 @@ class Candle(BaseModel):
     low: Decimal = Field(gt=0)
     close: Decimal = Field(gt=0)
     volume: Decimal = Field(ge=0)
+    partial: bool = False
+    complete: bool = True
+    source_count: int | None = Field(default=None, ge=1)
+    expected_source_count: int | None = Field(default=None, ge=1)
+    missing_source_count: int | None = Field(default=None, ge=0)
 
     @field_validator("timestamp")
     @classmethod
@@ -34,12 +39,18 @@ class Candle(BaseModel):
 
 class AggregatedCandle(Candle):
     closed: bool
-    partial: bool
+    source_count: int = Field(ge=1)
+    expected_source_count: int = Field(ge=1)
+    missing_source_count: int = Field(ge=0)
 
     @model_validator(mode="after")
     def closed_and_partial_are_complementary(self) -> "AggregatedCandle":
         if self.closed == self.partial:
             raise ValueError("An aggregated candle must be either closed or partial.")
+        if self.missing_source_count != self.expected_source_count - self.source_count:
+            raise ValueError("Aggregate source counts are inconsistent.")
+        if self.complete != (self.missing_source_count == 0):
+            raise ValueError("Aggregate completeness does not match missing source count.")
         return self
 
 
@@ -50,6 +61,9 @@ class CandleQueryMetadata(BaseModel):
     base_timeframe: str | None = None
     cache_hit: bool
     missing_ranges_fetched: int = Field(ge=0)
+    partial_candle_count: int = Field(default=0, ge=0)
+    incomplete_candle_count: int = Field(default=0, ge=0)
+    missing_source_candle_count: int = Field(default=0, ge=0)
 
 
 class CandleQueryResult(BaseModel):

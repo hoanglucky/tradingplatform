@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   createHeartbeatPong,
   getReconnectDelay,
+  mergeSourceCandleIntoTimeframe,
   mergeRealtimeCandle,
   normalizeRealtimeCandle,
   reconcileContiguousOpen,
@@ -116,6 +117,40 @@ test("adds the first realtime candle to an empty chart", () => {
   const merged = mergeRealtimeCandle([], historicalCandle);
 
   assert.deepEqual(merged, [historicalCandle]);
+});
+
+test("updates an active custom bucket from its one-minute live source", () => {
+  const aggregate = {
+    ...historicalCandle,
+    timeframe: "3m",
+    timestamp: "2026-06-29T08:00:00Z",
+    open: 100,
+    high: 103,
+    low: 99,
+    close: 102,
+    volume: 20,
+  };
+  const minute = {
+    ...historicalCandle,
+    timestamp: "2026-06-29T08:02:00Z",
+    high: 105,
+    low: 101,
+    close: 104,
+    volume: 8,
+  };
+
+  const merged = mergeSourceCandleIntoTimeframe([aggregate], minute, "3m");
+
+  assert.equal(merged.length, 1);
+  assert.deepEqual(merged[0], {...aggregate, high: 105, close: 104});
+});
+
+test("opens a new UTC-aligned custom bucket from the live source", () => {
+  const minute = {...historicalCandle, timestamp: "2026-06-29T08:06:00Z"};
+  const merged = mergeSourceCandleIntoTimeframe([], minute, "3m");
+
+  assert.equal(merged[0].timeframe, "3m");
+  assert.equal(merged[0].timestamp, "2026-06-29T08:06:00.000Z");
 });
 
 test("uses the previous close as open for contiguous realtime candles", () => {

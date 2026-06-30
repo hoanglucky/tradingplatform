@@ -14,6 +14,45 @@ Use this file to track task-level handoff notes for Codex sessions.
 
 ## Completed
 
+### 2026-06-30 - Unified Oanda realtime clock
+
+- Removed independent M1/M5 polling phase drift by deriving every Oanda chart timeframe from one shared M1 stream.
+- Optimized live rendering to update only the final candle when history is unchanged.
+- Verified with 60 frontend tests, lint, typecheck, and a production build.
+
+### 2026-06-30 - Smooth custom timeframe live updates
+
+- Replaced custom-timeframe polling with a deduplicated M1 WebSocket source.
+- Updates active custom OHLC buckets on every source event using UTC-aligned boundaries.
+- Keeps REST history/resume reconciliation and hides the expected active-partial warning while Live.
+- Verified with 60 frontend tests, lint, typecheck, and production build.
+
+### 2026-06-30 - M3 live aggregate repair
+
+- Rebuilds an incomplete trailing aggregate instead of accepting stale cache coverage.
+- Includes the active M3 bucket in frontend polling requests.
+- Added backend and frontend regressions for missing-source repair and active request alignment.
+
+### 2026-06-30 - Day 30.22 custom timeframe documentation
+
+- Documented parser, aggregator, direct/fallback routing, cache, lifecycle, and quality behavior.
+- Added `/market/candles` custom examples and metadata response contract.
+- Removed stale deferred-aggregation and shared-price descriptions.
+
+### 2026-06-30 - Day 30.21 custom timeframe quality UX
+
+- Persisted partial/completeness and source-count metadata with Alembic.
+- Added API quality summaries that survive cache hits.
+- Added missing/partial warnings and diagnostics to chart-window headers.
+- Verified 99 market-data, 57 API, and 57 frontend tests.
+
+### 2026-06-30 - Day 30.20 custom timeframe edge cases
+
+- Added aggregate source completeness metadata.
+- Deduplicated source timestamps without double-counting volume.
+- Covered missing data, UTC day boundaries, DST, partial, empty, and invalid cases.
+- Verified all 98 market-data tests pass.
+
 ### 2026-06-30 - Custom timeframe ordering polish
 
 - Sorted favorites and chart-window options by duration.

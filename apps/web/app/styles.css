@@ -999,6 +999,20 @@ h2 {
   white-space: nowrap;
 }
 
+.window-quality-warning {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--danger);
+  font-size: 0.68rem;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.window-quality-warning.is-partial {
+  color: #8a5a00;
+}
+
 .multi-timeframe-window-header span,
 .review-window-timeframe > span {
   color: var(--muted);

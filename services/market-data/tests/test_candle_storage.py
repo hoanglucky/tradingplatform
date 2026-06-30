@@ -224,3 +224,52 @@ async def test_repeated_aggregate_request_uses_exact_target_cache() -> None:
     assert second.candles == first.candles
     assert provider.calls == 1
     assert repository.commits == commits_after_first
+
+
+@pytest.mark.anyio
+async def test_aggregate_quality_metadata_survives_cache_hit() -> None:
+    start = datetime(2024, 6, 19, 8, 0, tzinfo=UTC)
+    end = start + timedelta(minutes=6)
+    source = [
+        make_candle(start + timedelta(minutes=index))
+        for index in range(6)
+        if index != 2
+    ]
+    repository = FakeRepository()
+    provider = FakeProvider(source, exchange="oanda")
+    service = CandleStorageService(repository, provider)
+
+    first = await service.get_candles_with_metadata("XAUUSD", "3m", start, end)
+    second = await service.get_candles_with_metadata("XAUUSD", "3m", start, end)
+
+    assert first.metadata.incomplete_candle_count == 1
+    assert first.metadata.missing_source_candle_count == 1
+    assert second.metadata.cache_hit is True
+    assert second.metadata.incomplete_candle_count == 1
+    assert second.metadata.missing_source_candle_count == 1
+
+
+@pytest.mark.anyio
+async def test_incomplete_trailing_aggregate_is_rebuilt() -> None:
+    start = datetime(2024, 6, 19, 8, 0, tzinfo=UTC)
+    stale = make_candle(start).model_copy(
+        update={
+            "timeframe": "3m",
+            "complete": False,
+            "source_count": 2,
+            "expected_source_count": 3,
+            "missing_source_count": 1,
+        }
+    )
+    source = [make_candle(start + timedelta(minutes=index)) for index in range(3)]
+    repository = FakeRepository([stale])
+    provider = FakeProvider(source, exchange="oanda")
+    service = CandleStorageService(repository, provider)
+
+    result = await service.get_candles_with_metadata(
+        "XAUUSD", "3m", start, start + timedelta(minutes=3)
+    )
+
+    assert provider.requested_timeframes == ["1m"]
+    assert result.candles[-1].complete is True
+    assert result.metadata.missing_source_candle_count == 0

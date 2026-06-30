@@ -1746,3 +1746,137 @@ Implement Day 28.
 
 - Added coverage proving `5m`, `6m`, `15m`, `1h`, `2w`, `1M` ordering.
 - 57 frontend tests, lint, typecheck, and production build passed.
+
+## 2026-06-30 - Day 30.20 custom timeframe edge cases
+
+### Work completed
+
+- Deduplicated source candles before aggregate OHLCV calculation.
+- Added explicit completeness, source count, expected count, and missing count fields.
+- Kept missing intervals absent instead of manufacturing candle values.
+- Preserved fixed UTC bucketing across day and DST boundaries.
+
+### Verification performed
+
+- Added missing-source, duplicate, day-boundary, and DST regression tests.
+- Existing unsorted, partial, empty, and invalid-input coverage remains passing.
+- 98 market-data tests passed.
+
+### Safety notes
+
+- This remains deterministic read-only OHLCV resampling and does not generate signals or orders.
+
+## 2026-06-30 - Day 30.21 custom timeframe quality UX
+
+### Work completed
+
+- Added Alembic persistence for candle partial/completeness and source-count metadata.
+- Preserved aggregate quality diagnostics across cache hits.
+- Extended candle API metadata with partial, incomplete, and missing-source totals.
+- Added visible `Missing N` and `Partial` warnings with tooltips to chart-window headers.
+- Kept direct-provider and aggregate-base labels alongside the warning.
+
+### Verification performed
+
+- Added cache-hit quality persistence coverage.
+- 99 market-data, 57 API, and 57 frontend tests passed.
+- API and market-data Ruff checks passed.
+- Frontend lint, typecheck, and production build passed.
+
+### Safety notes
+
+- Quality metadata is observational and read-only; it does not alter signals or execute trades.
+
+## 2026-06-30 - Eight-window custom timeframe and reset repair
+
+### Work completed
+
+- Completed deployment of candle-quality migration and matching API/web contracts.
+- Moved right-click reset handling from the inner chart canvas to the complete chart shell.
+- Rebuilt aggregate caches after adding persisted quality metadata.
+
+### Verification performed
+
+- Ran eight XAUUSD timeframe requests concurrently: 1m, 3m, 5m, 10m, 15m, 30m, 1h, and 4h.
+- All eight returned HTTP 200 with candles; 3m aggregated from 1m and 10m aggregated from 5m.
+- Frontend lint, typecheck, 57 tests, and production build passed.
+- Web and API containers are healthy and chart route returns HTTP 200.
+
+## 2026-06-30 - Day 30.22 custom timeframe documentation
+
+### Work completed
+
+- Updated architecture for parser rules, direct-versus-aggregate routing, UTC/week/month buckets, cache behavior, and persisted quality metadata.
+- Corrected stale architecture text about deferred aggregation and cross-timeframe realtime synchronization.
+- Documented the current `/market/candles` envelope and all metadata fields.
+- Added direct/custom curl examples, timeframe validation, quality semantics, cache-hit behavior, and error boundaries.
+- Documented that aggregation is deterministic OHLCV resampling, not prediction or financial advice.
+
+### Verification performed
+
+- Checked architecture and API docs for stale deferred/custom contract wording.
+- Markdown diff check passed.
+
+## 2026-06-30 - M3 live aggregate repair
+
+### Work completed
+
+- Invalidated trailing aggregate cache coverage when the last candle is partial or incomplete.
+- Rebuilt stale M3 candles from newly available M1 source candles, removing false persistent `Missing 1` warnings.
+- Included the active target bucket in polling requests so custom timeframes keep advancing before candle close.
+
+### Verification performed
+
+- Added a market-data regression for repairing an incomplete trailing M3 aggregate.
+- Added frontend coverage for the current-minute end boundary of an active M3 request.
+- 100 market-data and 58 frontend tests passed; frontend typecheck and production build passed.
+- Rebuilt and deployed web and market-data containers; both are healthy.
+- Live XAUUSD M3 verification returned 120 candles, the active UTC bucket, zero missing source candles, and one expected partial candle.
+
+### Safety notes
+
+- The change only repairs read-only market-data aggregation and does not enable exchange writes or live trading.
+
+## 2026-06-30 - Smooth custom timeframe live updates
+
+### Work completed
+
+- Replaced 10-second custom-timeframe polling with the provider's shared M1 WebSocket stream.
+- Aggregated each incoming M1 update into the active custom bucket using fixed UTC, Monday-week, and calendar-month boundaries.
+- Deduplicated stream subscriptions so several custom windows for one symbol share a single M1 connection.
+- Retained REST history loading and visibility/focus resynchronization as the authoritative recovery path.
+- Suppressed the expected single active-partial warning while the stream is connected; missing-source warnings remain visible.
+
+### Verification performed
+
+- Added tests for M1-to-M3 updates, new M3 bucket alignment, and custom-to-M1 stream routing.
+- 60 frontend tests, lint, typecheck, and production build passed.
+- Deployed the web container and verified `/dashboard/chart` is healthy.
+- Live probe subscribed to Oanda XAUUSD M1 and received an open candle update from the real provider.
+
+### Safety notes
+
+- Streaming and aggregation remain read-only and cannot place exchange orders.
+
+## 2026-06-30 - Unified Oanda realtime clock
+
+### Root cause
+
+- Oanda M1 and M5 used independent two-second polling loops, measured roughly 1.3 seconds out of phase with temporarily different closes.
+- Lightweight Charts received `setData` for the complete history on every live event, causing unnecessary redraws.
+
+### Work completed
+
+- Routed every Oanda chart timeframe through one deduplicated M1 stream per symbol.
+- Derived active M5 and higher/custom buckets from the same M1 update, giving every visible window one price clock.
+- Switched ordinary live changes to `series.update` for the last candle; full `setData` remains for history/resync changes.
+
+### Verification performed
+
+- Measured simultaneous live M1/M5 Oanda streams to reproduce the phase offset.
+- Updated realtime-source routing coverage; 60 frontend tests, lint, and typecheck passed.
+- Production build passed; the new web image was deployed and the chart route is healthy.
+
+### Safety notes
+
+- This is read-only display synchronization and does not change exchange permissions.

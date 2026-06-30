@@ -388,12 +388,12 @@ Market-data endpoints are served by `services/market-data` on port `8101`.
 
 ### `GET /market/candles`
 
-Returns normalized candles for a symbol and time range.
+Returns normalized candles and request metadata for a symbol and time range.
 
 Required query parameters:
 
 - `symbol`: internal symbol such as `BTCUSDT` or `XAUUSD`
-- `timeframe`: provider-supported timeframe such as `1m`, `5m`, `1h`, or `1d`
+- `timeframe`: native or custom interval such as `1m`, `7m`, `10m`, `45m`, `3h`, `2w`, or `1M`
 - `start`: timezone-aware ISO 8601 datetime
 - `end`: timezone-aware ISO 8601 datetime
 
@@ -409,22 +409,54 @@ Oanda example:
 curl "http://localhost:8101/market/candles?symbol=XAUUSD&timeframe=5m&start=2024-06-19T08:00:00Z&end=2024-06-19T09:00:00Z"
 ```
 
+Custom Oanda example (`10m` aggregates from native `5m` candles):
+
+```bash
+curl "http://localhost:8101/market/candles?symbol=XAUUSD&timeframe=10m&start=2024-06-19T08:00:00Z&end=2024-06-19T10:00:00Z"
+```
+
 Example response:
 
 ```json
-[
-  {
-    "symbol": "BTCUSDT",
-    "timeframe": "1m",
-    "timestamp": "2024-06-19T08:00:00Z",
-    "open": "65000.10000000",
-    "high": "65100.25000000",
-    "low": "64950.00000000",
-    "close": "65050.50000000",
-    "volume": "123.45600000"
+{
+  "candles": [
+    {
+      "symbol": "XAUUSD",
+      "timeframe": "10m",
+      "timestamp": "2024-06-19T08:00:00Z",
+      "open": "2325.10000000",
+      "high": "2327.25000000",
+      "low": "2324.90000000",
+      "close": "2326.50000000",
+      "volume": "123.00000000",
+      "partial": false,
+      "complete": true,
+      "source_count": 2,
+      "expected_source_count": 2,
+      "missing_source_count": 0
+    }
+  ],
+  "metadata": {
+    "source_provider": "oanda",
+    "source_market_type": "cfd_fx",
+    "aggregation_used": true,
+    "base_timeframe": "5m",
+    "cache_hit": false,
+    "missing_ranges_fetched": 1,
+    "partial_candle_count": 0,
+    "incomplete_candle_count": 0,
+    "missing_source_candle_count": 0
   }
-]
+}
 ```
+
+Timeframe rules:
+
+- Ordinary values use positive integer `m`, `h`, `d`, or `w` units and cannot exceed one month.
+- `1m` means one minute; exact `1M` means one calendar month.
+- Weeks start Monday UTC. Calendar months start on the first day at `00:00:00Z`.
+- The target must be an exact multiple of an available native base timeframe.
+- Invalid values such as `0m`, `-5m`, `1x`, or `5w` return `400`.
 
 Provider selection:
 
@@ -437,6 +469,16 @@ Cache behavior:
 - An incomplete range is fetched from the selected provider and upserted into PostgreSQL.
 - Duplicate provider rows are collapsed by timestamp before upsert.
 - PostgreSQL guarantees uniqueness by symbol, timeframe, and timestamp.
+- Aggregate target candles are cached under the requested timeframe.
+- A repeated covered request reports `cache_hit=true`, zero fetched ranges, and does not call the provider or aggregate again.
+
+Quality behavior:
+
+- `partial=true` means the aggregate target bucket is still active.
+- `complete=false` means one or more expected source candles are absent.
+- Missing source intervals are reported and are never filled with invented prices or volume.
+- Quality fields persist in PostgreSQL and remain available on cache hits.
+- Aggregation is OHLCV resampling only. It does not predict price or produce BUY/SELL advice.
 
 Error responses:
 

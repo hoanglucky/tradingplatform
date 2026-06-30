@@ -51,6 +51,9 @@ export type CandleQueryMetadata = {
   base_timeframe: string | null;
   cache_hit: boolean;
   missing_ranges_fetched: number;
+  partial_candle_count: number;
+  incomplete_candle_count: number;
+  missing_source_candle_count: number;
 };
 
 export type CandleQueryResult = {
@@ -94,6 +97,7 @@ export function recentCandleRequest(
   timeframe: string,
   nowMilliseconds = Date.now(),
   candleCount = 120,
+  includeActive = false,
 ): CandleRequest {
   if (timeframe === "1M") {
     const now = new Date(nowMilliseconds);
@@ -106,12 +110,15 @@ export function recentCandleRequest(
   }
   const interval = timeframeSeconds(timeframe);
   const anchorSeconds = timeframe.endsWith("w") ? Date.UTC(1970, 0, 5) / 1000 : 0;
-  const endSeconds =
+  const alignedEndSeconds =
     Math.floor((nowMilliseconds / 1000 - anchorSeconds) / interval) * interval + anchorSeconds;
+  const endSeconds = includeActive
+    ? Math.floor(nowMilliseconds / 60_000) * 60
+    : alignedEndSeconds;
   return {
     symbol,
     timeframe,
-    start: new Date((endSeconds - interval * candleCount) * 1000),
+    start: new Date((alignedEndSeconds - interval * candleCount) * 1000),
     end: new Date(endSeconds * 1000),
   };
 }
@@ -167,7 +174,13 @@ export async function fetchMarketCandleResult(
     !(typeof metadata.base_timeframe === "string" || metadata.base_timeframe === null) ||
     typeof metadata.cache_hit !== "boolean" ||
     !Number.isInteger(metadata.missing_ranges_fetched) ||
-    Number(metadata.missing_ranges_fetched) < 0
+    Number(metadata.missing_ranges_fetched) < 0 ||
+    !Number.isInteger(metadata.partial_candle_count) ||
+    Number(metadata.partial_candle_count) < 0 ||
+    !Number.isInteger(metadata.incomplete_candle_count) ||
+    Number(metadata.incomplete_candle_count) < 0 ||
+    !Number.isInteger(metadata.missing_source_candle_count) ||
+    Number(metadata.missing_source_candle_count) < 0
   ) {
     throw new Error("Market data response contains invalid metadata.");
   }

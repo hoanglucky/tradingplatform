@@ -98,6 +98,11 @@ class CandleStorageService:
                     base_timeframe=base_timeframe,
                     cache_hit=True,
                     missing_ranges_fetched=0,
+                    partial_candle_count=sum(candle.partial for candle in cached),
+                    incomplete_candle_count=sum(not candle.complete for candle in cached),
+                    missing_source_candle_count=sum(
+                        candle.missing_source_count or 0 for candle in cached
+                    ),
                 ),
             )
 
@@ -115,7 +120,7 @@ class CandleStorageService:
             base_candles = base_result.candles
             missing_ranges_fetched = base_result.metadata.missing_ranges_fetched
             fetched = [
-                Candle.model_validate(candle.model_dump(exclude={"closed", "partial"}))
+                Candle.model_validate(candle.model_dump(exclude={"closed"}))
                 for candle in aggregate_candles(base_candles, timeframe)
             ]
         unique = list({candle.timestamp: candle for candle in fetched}.values())
@@ -135,6 +140,11 @@ class CandleStorageService:
                 base_timeframe=base_timeframe,
                 cache_hit=False,
                 missing_ranges_fetched=missing_ranges_fetched,
+                partial_candle_count=sum(candle.partial for candle in result),
+                incomplete_candle_count=sum(not candle.complete for candle in result),
+                missing_source_candle_count=sum(
+                    candle.missing_source_count or 0 for candle in result
+                ),
             ),
         )
 
@@ -173,6 +183,8 @@ class CandleStorageService:
             except ValueError:
                 return False
         if not candles or duration is None:
+            return False
+        if candles[-1].partial or not candles[-1].complete:
             return False
         leading_tolerance = timedelta(days=3) if exchange == "oanda" else duration
         return (

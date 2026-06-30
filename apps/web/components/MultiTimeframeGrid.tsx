@@ -1,6 +1,7 @@
 "use client";
 
 import type { Candle, MultiTimeframeWindow } from "@trading-framework/shared";
+import { AlertTriangle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import {
   type MultiTimeframeLayout,
@@ -16,12 +17,13 @@ import {
 import {
   createHeartbeatPong,
   getReconnectDelay,
+  mergeSourceCandleIntoTimeframe,
   mergeRealtimeCandle,
   normalizeRealtimeCandle,
   shouldResumeMarketData,
 } from "../lib/market-stream";
 import { CandlestickChart } from "./CandlestickChart";
-import { supportsRealtimeTimeframe } from "../lib/timeframe-options";
+import { realtimeSourceTimeframe } from "../lib/timeframe-options";
 
 const marketDataBaseUrl = process.env.NEXT_PUBLIC_MARKET_DATA_BASE_URL ?? "http://localhost:8101";
 const marketWebSocketUrl = process.env.NEXT_PUBLIC_MARKET_WS_URL ?? "ws://localhost:8000/ws/market";
@@ -55,6 +57,7 @@ type MultiTimeframeChartWindowProps = {
   refreshVersion: number;
   resumeVersion: number;
   realtimeCandles?: Candle[];
+  realtimeSourceTimeframe: string;
   realtimeStatus: RealtimeStatus;
   chartHeight: number;
   active: boolean;
@@ -79,6 +82,7 @@ function MultiTimeframeChartWindow({
   refreshVersion,
   resumeVersion,
   realtimeCandles,
+  realtimeSourceTimeframe,
   realtimeStatus,
   chartHeight,
   active,
@@ -98,10 +102,12 @@ function MultiTimeframeChartWindow({
   }, [realtimeCandles]);
 
   const candles = (realtimeCandles ?? []).reduce(
-    (current, candle) => mergeRealtimeCandle(current, candle),
+    (current, candle) =>
+      mergeSourceCandleIntoTimeframe(current, candle, reviewWindow.timeframe),
     historicalCandles,
   );
   const visibleError = realtimeCandles?.length ? null : error;
+  const includeActiveCandle = realtimeSourceTimeframe !== reviewWindow.timeframe;
 
   useEffect(() => {
     const controller = new AbortController();
@@ -116,7 +122,13 @@ function MultiTimeframeChartWindow({
       try {
         const result = await fetchMarketCandleResult(
           marketDataBaseUrl,
-          recentCandleRequest(symbol, reviewWindow.timeframe),
+          recentCandleRequest(
+            symbol,
+            reviewWindow.timeframe,
+            Date.now(),
+            120,
+            includeActiveCandle,
+          ),
           controller.signal,
         );
         const historical = result.candles;
@@ -124,7 +136,8 @@ function MultiTimeframeChartWindow({
         const currentRealtime = realtimeCandlesRef.current ?? [];
         setHistoricalCandles(
           currentRealtime.reduce(
-            (current, candle) => mergeRealtimeCandle(current, candle),
+            (current, candle) =>
+              mergeSourceCandleIntoTimeframe(current, candle, reviewWindow.timeframe),
             historical,
           ),
         );
@@ -141,7 +154,7 @@ function MultiTimeframeChartWindow({
 
     void loadCandles();
     return () => controller.abort();
-  }, [refreshVersion, resumeVersion, reviewWindow.timeframe, symbol]);
+  }, [includeActiveCandle, refreshVersion, resumeVersion, reviewWindow.timeframe, symbol]);
 
   return (
     <article
@@ -165,6 +178,23 @@ function MultiTimeframeChartWindow({
               {metadata.aggregation_used
                 ? `Aggregated from ${metadata.base_timeframe}`
                 : `${metadata.source_provider} · Direct`}
+            </span>
+          ) : null}
+          {metadata?.missing_source_candle_count ? (
+            <span
+              className="window-quality-warning"
+              title={`${metadata.incomplete_candle_count} incomplete aggregate candles; ${metadata.missing_source_candle_count} source candles missing.`}
+            >
+              <AlertTriangle size={13} aria-hidden="true" />
+              Missing {metadata.missing_source_candle_count}
+            </span>
+          ) : metadata?.partial_candle_count && realtimeStatus !== "connected" ? (
+            <span
+              className="window-quality-warning is-partial"
+              title={`${metadata.partial_candle_count} active partial candle${metadata.partial_candle_count === 1 ? "" : "s"}.`}
+            >
+              <AlertTriangle size={13} aria-hidden="true" />
+              Partial
             </span>
           ) : null}
         </div>
@@ -220,15 +250,13 @@ export function MultiTimeframeGrid({
 }: MultiTimeframeGridProps) {
   const visibleWindows = visibleMultiTimeframeWindows(layout);
   const realtimeTimeframes = uniqueVisibleMultiTimeframeTimeframes(layout);
-  const directRealtimeTimeframes = realtimeTimeframes.filter((timeframe) =>
-    supportsRealtimeTimeframe(layout.symbol, timeframe),
-  );
-  const realtimeKey = directRealtimeTimeframes.join(",");
-  const hasPollingTimeframes = directRealtimeTimeframes.length !== realtimeTimeframes.length;
+  const realtimeSources = [...new Set(
+    realtimeTimeframes.map((timeframe) => realtimeSourceTimeframe(layout.symbol, timeframe)),
+  )];
+  const realtimeKey = realtimeSources.join(",");
   const [realtimeCandles, setRealtimeCandles] = useState<Record<string, Candle[]>>({});
   const [realtimeStatuses, setRealtimeStatuses] = useState<Record<string, RealtimeStatus>>({});
   const [resumeVersion, setResumeVersion] = useState(0);
-  const [pollVersion, setPollVersion] = useState(0);
 
   useEffect(() => {
     let lastResumeAt = 0;
@@ -249,16 +277,6 @@ export function MultiTimeframeGrid({
       window.removeEventListener("online", resynchronizeAfterPause);
     };
   }, []);
-
-  useEffect(() => {
-    if (!hasPollingTimeframes) return;
-    const timer = window.setInterval(() => {
-      if (document.visibilityState === "visible") {
-        setPollVersion((version) => version + 1);
-      }
-    }, 10_000);
-    return () => window.clearInterval(timer);
-  }, [hasPollingTimeframes]);
 
   useEffect(() => {
     const timeframes = realtimeKey.split(",").filter(Boolean) as MultiTimeframeTimeframe[];
@@ -359,28 +377,28 @@ export function MultiTimeframeGrid({
       className={`multi-timeframe-grid is-layout-${layout.windowCount}`}
       aria-label={`${layout.symbol} multi-timeframe review windows`}
     >
-      {visibleWindows.map((reviewWindow) => (
-        <MultiTimeframeChartWindow
-          key={reviewWindow.id}
-          symbol={layout.symbol}
-          timezone={timezone}
-          reviewWindow={reviewWindow}
-          timeframeOptions={timeframeOptions}
-          refreshVersion={refreshVersion}
-          resumeVersion={resumeVersion + pollVersion}
-          realtimeCandles={realtimeCandles[`${layout.symbol}:${reviewWindow.timeframe}`]}
-          realtimeStatus={
-            supportsRealtimeTimeframe(layout.symbol, reviewWindow.timeframe)
-              ? realtimeStatuses[`${layout.symbol}:${reviewWindow.timeframe}`] ?? "connecting"
-              : "polling"
-          }
-          chartHeight={layout.windowCount === 1 ? 460 : 260}
-          active={reviewWindow.id === activeWindowId}
-          onActivate={() => onActiveWindowChange(reviewWindow.id)}
-          onTimeframeChange={onTimeframeChange}
-          onReviewChange={onReviewChange}
-        />
-      ))}
+      {visibleWindows.map((reviewWindow) => {
+        const sourceTimeframe = realtimeSourceTimeframe(layout.symbol, reviewWindow.timeframe);
+        return (
+          <MultiTimeframeChartWindow
+            key={reviewWindow.id}
+            symbol={layout.symbol}
+            timezone={timezone}
+            reviewWindow={reviewWindow}
+            timeframeOptions={timeframeOptions}
+            refreshVersion={refreshVersion}
+            resumeVersion={resumeVersion}
+            realtimeCandles={realtimeCandles[`${layout.symbol}:${sourceTimeframe}`]}
+            realtimeSourceTimeframe={sourceTimeframe}
+            realtimeStatus={realtimeStatuses[`${layout.symbol}:${sourceTimeframe}`] ?? "connecting"}
+            chartHeight={layout.windowCount === 1 ? 460 : 260}
+            active={reviewWindow.id === activeWindowId}
+            onActivate={() => onActiveWindowChange(reviewWindow.id)}
+            onTimeframeChange={onTimeframeChange}
+            onReviewChange={onReviewChange}
+          />
+        );
+      })}
     </section>
   );
 }

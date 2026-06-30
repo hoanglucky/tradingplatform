@@ -96,6 +96,54 @@ export function mergeRealtimeCandle(candles: Candle[], nextCandle: Candle, limit
   return [...candles, reconcileContiguousOpen(candles[candles.length - 1], nextCandle)].slice(-limit);
 }
 
+function targetBucketTimestamp(timestamp: number, timeframe: string): number | null {
+  if (timeframe === "1M") {
+    const date = new Date(timestamp);
+    return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1);
+  }
+  const duration = timeframeDurationMilliseconds(timeframe, timestamp);
+  if (!duration) return null;
+  if (timeframe.endsWith("w")) {
+    const mondayAnchor = Date.UTC(1970, 0, 5);
+    return Math.floor((timestamp - mondayAnchor) / duration) * duration + mondayAnchor;
+  }
+  return Math.floor(timestamp / duration) * duration;
+}
+
+export function mergeSourceCandleIntoTimeframe(
+  candles: Candle[],
+  sourceCandle: Candle,
+  targetTimeframe: string,
+  limit = 500,
+): Candle[] {
+  if (sourceCandle.timeframe === targetTimeframe) {
+    return mergeRealtimeCandle(candles, sourceCandle, limit);
+  }
+  const bucketTimestamp = targetBucketTimestamp(Date.parse(sourceCandle.timestamp), targetTimeframe);
+  if (bucketTimestamp === null) return candles;
+  const bucketIndex = candles.findIndex(
+    (candle) => Date.parse(candle.timestamp) === bucketTimestamp,
+  );
+  if (bucketIndex >= 0) {
+    const current = candles[bucketIndex];
+    const updated = candles.slice();
+    updated[bucketIndex] = {
+      ...current,
+      high: Math.max(current.high, sourceCandle.high),
+      low: Math.min(current.low, sourceCandle.low),
+      close: sourceCandle.close,
+      volume: Math.max(current.volume, sourceCandle.volume),
+    };
+    return updated;
+  }
+  const aggregate: Candle = {
+    ...sourceCandle,
+    timeframe: targetTimeframe,
+    timestamp: new Date(bucketTimestamp).toISOString(),
+  };
+  return mergeRealtimeCandle(candles, aggregate, limit);
+}
+
 function timeframeDurationMilliseconds(timeframe: string, timestamp: number): number | null {
   if (timeframe === "1M") {
     const open = new Date(timestamp);

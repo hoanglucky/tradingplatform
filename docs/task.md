@@ -29,16 +29,16 @@
 
 ## Current review task
 
-Review aggregation cache metadata.
+Review custom timeframe documentation.
 
 Focus areas:
 
-- Request the same aggregate symbol/timeframe/range twice.
-- Confirm the first response reports a cache miss and fetched range count.
-- Confirm the second response reports `cache_hit=true` and zero fetched ranges.
-- Confirm direct chart windows show their provider and `Direct`.
-- Confirm custom aggregate windows show `Aggregated from {base timeframe}`.
-- Confirm candle data remains identical between miss and hit responses.
+- Confirm `1m` versus calendar-month `1M` is unambiguous.
+- Confirm direct provider and aggregate fallback flows match implementation.
+- Confirm weekly, monthly, closed, partial, complete, and missing semantics are accurate.
+- Confirm the API example uses the `{ candles, metadata }` response envelope.
+- Confirm cache-hit and quality metadata fields are explained.
+- Confirm docs state aggregation is resampling rather than prediction or financial advice.
 - Confirm no live trading or exchange write behavior was added.
 
 ## Verification commands

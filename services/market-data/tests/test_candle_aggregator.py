@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta, timezone
 from decimal import Decimal
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -50,6 +51,40 @@ def test_calculates_ohlcv_from_the_bucket() -> None:
     assert result[0].low == Decimal("99")
     assert result[0].close == Decimal("104.5")
     assert result[0].volume == Decimal("15")
+    assert result[0].complete is True
+    assert result[0].missing_source_count == 0
+
+
+def test_marks_closed_bucket_with_missing_source_candles() -> None:
+    candles = [candle for index, candle in enumerate(make_candles(5)) if index != 2]
+
+    result = aggregate_candles(
+        candles,
+        "5m",
+        as_of=datetime(1970, 1, 1, 0, 5, tzinfo=UTC),
+    )
+
+    assert result[0].source_count == 4
+    assert result[0].expected_source_count == 5
+    assert result[0].missing_source_count == 1
+    assert result[0].complete is False
+
+
+def test_duplicate_timestamp_uses_latest_value_once() -> None:
+    candles = make_candles(5)
+    replacement = candles[2].model_copy(
+        update={
+            "high": Decimal("150"),
+            "close": Decimal("149"),
+            "volume": Decimal("20"),
+        }
+    )
+
+    result = aggregate_candles([*candles, replacement], "5m")
+
+    assert result[0].high == Decimal("150")
+    assert result[0].volume == Decimal("32")
+    assert result[0].source_count == 5
 
 
 def test_groups_timezone_aware_input_into_utc_buckets() -> None:
@@ -68,6 +103,43 @@ def test_groups_timezone_aware_input_into_utc_buckets() -> None:
     assert result[0].timestamp.tzinfo is UTC
     assert result[0].open == Decimal("100")
     assert result[0].close == Decimal("104.5")
+
+
+def test_groups_across_utc_day_boundary() -> None:
+    candles = [
+        candle.model_copy(
+            update={"timestamp": datetime(2026, 6, 29, 23, 58, tzinfo=UTC) + timedelta(minutes=index)}
+        )
+        for index, candle in enumerate(make_candles(5))
+    ]
+
+    result = aggregate_candles(candles, "5m")
+
+    assert [candle.timestamp for candle in result] == [
+        datetime(2026, 6, 29, 23, 55, tzinfo=UTC),
+        datetime(2026, 6, 30, 0, 0, tzinfo=UTC),
+    ]
+
+
+def test_dst_input_still_uses_fixed_utc_buckets() -> None:
+    new_york = ZoneInfo("America/New_York")
+    utc_candles = [
+        candle.model_copy(
+            update={"timestamp": datetime(2026, 3, 8, 6, 58, tzinfo=UTC) + timedelta(minutes=index)}
+        )
+        for index, candle in enumerate(make_candles(5))
+    ]
+    local_candles = [
+        candle.model_copy(update={"timestamp": candle.timestamp.astimezone(new_york)})
+        for candle in utc_candles
+    ]
+
+    result = aggregate_candles(local_candles, "5m")
+
+    assert [candle.timestamp for candle in result] == [
+        datetime(2026, 3, 8, 6, 55, tzinfo=UTC),
+        datetime(2026, 3, 8, 7, 0, tzinfo=UTC),
+    ]
 
 
 def test_empty_input_returns_empty_output() -> None:

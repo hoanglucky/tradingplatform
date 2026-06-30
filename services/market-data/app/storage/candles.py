@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, Column, DateTime, MetaData, Numeric, String, Table, func, select
+from sqlalchemy import Boolean, Column, DateTime, Integer, MetaData, Numeric, String, Table, func, select
 from sqlalchemy.dialects.postgresql import UUID, insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -36,6 +36,11 @@ candles_table = Table(
     Column("low", Numeric(20, 8), nullable=False),
     Column("close", Numeric(20, 8), nullable=False),
     Column("volume", Numeric(28, 8), nullable=False),
+    Column("partial", Boolean, nullable=False),
+    Column("complete", Boolean, nullable=False),
+    Column("source_count", Integer, nullable=True),
+    Column("expected_source_count", Integer, nullable=True),
+    Column("missing_source_count", Integer, nullable=True),
     Column("created_at", DateTime(timezone=True), nullable=False),
     Column("updated_at", DateTime(timezone=True), nullable=False),
 )
@@ -89,6 +94,11 @@ class CandleRepository:
                 low=row["low"],
                 close=row["close"],
                 volume=row["volume"],
+                partial=row["partial"],
+                complete=row["complete"],
+                source_count=row["source_count"],
+                expected_source_count=row["expected_source_count"],
+                missing_source_count=row["missing_source_count"],
             )
             for row in rows
         ]
@@ -108,6 +118,11 @@ class CandleRepository:
                 "low": candle.low,
                 "close": candle.close,
                 "volume": candle.volume,
+                "partial": candle.partial,
+                "complete": candle.complete,
+                "source_count": candle.source_count,
+                "expected_source_count": candle.expected_source_count,
+                "missing_source_count": candle.missing_source_count,
                 "created_at": func.now(),
                 "updated_at": func.now(),
             }
@@ -122,6 +137,11 @@ class CandleRepository:
                 "low": statement.excluded.low,
                 "close": statement.excluded.close,
                 "volume": statement.excluded.volume,
+                "partial": statement.excluded.partial,
+                "complete": statement.excluded.complete,
+                "source_count": statement.excluded.source_count,
+                "expected_source_count": statement.excluded.expected_source_count,
+                "missing_source_count": statement.excluded.missing_source_count,
                 "updated_at": func.now(),
             },
         )
