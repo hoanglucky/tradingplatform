@@ -1,7 +1,7 @@
 "use client";
 
 import type { Candle } from "@trading-framework/shared";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   CandlestickSeries,
   ColorType,
@@ -9,11 +9,16 @@ import {
   type CandlestickData,
   type IChartApi,
   type ISeriesApi,
+  type MouseEventParams,
   type Time,
   type UTCTimestamp,
 } from "lightweight-charts";
 import { resetCandlestickChartView } from "../lib/chart-view";
-import { candleOpenTimestampSeconds, formatChartTime } from "../lib/chart-time";
+import {
+  candleOpenTimestampSeconds,
+  formatCandleTimeRange,
+  formatChartTime,
+} from "../lib/chart-time";
 
 export type CandlestickChartProps = {
   candles: Candle[];
@@ -51,6 +56,7 @@ export function CandlestickChart({
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const fitContentRef = useRef(false);
+  const [inspectedTime, setInspectedTime] = useState<string | null>(null);
   const chartHeight = Math.max(height, 240);
   const hasData = candles.length > 0;
 
@@ -101,6 +107,13 @@ export function CandlestickChart({
     seriesRef.current = series;
     fitContentRef.current = true;
 
+    const handleCrosshairMove = (event: MouseEventParams<Time>) => {
+      setInspectedTime(
+        event.time ? formatCandleTimeRange(event.time, timeframe, timezone) : null,
+      );
+    };
+    chart.subscribeCrosshairMove(handleCrosshairMove);
+
     const resizeObserver = new ResizeObserver(([entry]) => {
       chart.applyOptions({ width: Math.floor(entry.contentRect.width) });
     });
@@ -110,6 +123,7 @@ export function CandlestickChart({
       chartRef.current = null;
       seriesRef.current = null;
       fitContentRef.current = false;
+      chart.unsubscribeCrosshairMove(handleCrosshairMove);
       resizeObserver.disconnect();
       chart.remove();
     };
@@ -155,15 +169,22 @@ export function CandlestickChart({
   }
 
   return (
-    <div
-      ref={containerRef}
-      className="chart-canvas"
-      style={{ height: chartHeight, minHeight: chartHeight }}
-      aria-label={`${symbol} ${timeframe} candlestick chart`}
-      onContextMenu={(event) => {
-        event.preventDefault();
-        resetCandlestickChartView(chartRef.current);
-      }}
-    />
+    <div className="chart-canvas-shell" style={{ height: chartHeight, minHeight: chartHeight }}>
+      {inspectedTime ? (
+        <output className="chart-inspected-time" aria-live="polite">
+          {inspectedTime}
+        </output>
+      ) : null}
+      <div
+        ref={containerRef}
+        className="chart-canvas"
+        style={{ height: chartHeight, minHeight: chartHeight }}
+        aria-label={`${symbol} ${timeframe} candlestick chart`}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          resetCandlestickChartView(chartRef.current);
+        }}
+      />
+    </div>
   );
 }

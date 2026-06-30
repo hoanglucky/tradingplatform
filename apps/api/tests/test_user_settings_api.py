@@ -101,6 +101,16 @@ def test_patch_settings_persists_multi_timeframe_layout() -> None:
     assert client.get("/settings").json()["multi_timeframe_layout"] == layout
 
 
+def test_patch_settings_persists_custom_timeframe_layout() -> None:
+    layout = layout_payload()
+    layout["windows"][0]["timeframe"] = "45m"
+
+    response = client.patch("/settings", json={"multi_timeframe_layout": layout})
+
+    assert response.status_code == 200
+    assert response.json()["multi_timeframe_layout"]["windows"][0]["timeframe"] == "45m"
+
+
 def test_patch_settings_rejects_unknown_layout_symbol() -> None:
     response = client.patch(
         "/settings",

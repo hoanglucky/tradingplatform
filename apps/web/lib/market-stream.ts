@@ -11,6 +11,15 @@ export function getReconnectDelay(attempt: number, baseDelayMs: number, maxDelay
   return Math.min(baseDelayMs * 2 ** normalizedAttempt, maxDelayMs);
 }
 
+export function shouldResumeMarketData(
+  visibilityState: DocumentVisibilityState,
+  lastResumeAt: number,
+  now: number,
+  minimumIntervalMs = 1000,
+): boolean {
+  return visibilityState === "visible" && now - lastResumeAt >= minimumIntervalMs;
+}
+
 export function createHeartbeatPong(payload: unknown): { type: "pong"; id: number } | null {
   if (
     !isRecord(payload) ||
@@ -76,7 +85,7 @@ export function mergeRealtimeCandle(candles: Candle[], nextCandle: Candle, limit
 
   if (existingIndex >= 0) {
     const updated = candles.slice();
-    updated[existingIndex] = nextCandle;
+    updated[existingIndex] = reconcileContiguousOpen(candles[existingIndex - 1], nextCandle);
     return updated;
   }
 
@@ -84,19 +93,35 @@ export function mergeRealtimeCandle(candles: Candle[], nextCandle: Candle, limit
   if (nextTimestamp <= latestTimestamp) {
     return candles;
   }
-  return [...candles, nextCandle].slice(-limit);
+  return [...candles, reconcileContiguousOpen(candles[candles.length - 1], nextCandle)].slice(-limit);
 }
 
-export function synchronizeLatestCandlePrice(candles: Candle[], price: number): Candle[] {
-  if (candles.length === 0 || !Number.isFinite(price) || price <= 0) {
-    return candles;
+function timeframeDurationMilliseconds(timeframe: string, timestamp: number): number | null {
+  if (timeframe === "1M") {
+    const open = new Date(timestamp);
+    return (
+      Date.UTC(open.getUTCFullYear(), open.getUTCMonth() + 1, 1) -
+      Date.UTC(open.getUTCFullYear(), open.getUTCMonth(), 1)
+    );
   }
-  const latest = candles[candles.length - 1];
-  const synchronized = {
-    ...latest,
-    high: Math.max(latest.high, price),
-    low: Math.min(latest.low, price),
-    close: price,
+  const match = /^([1-9][0-9]*)([mhdw])$/i.exec(timeframe);
+  if (!match) return null;
+  const multiplier = { m: 60_000, h: 3_600_000, d: 86_400_000, w: 604_800_000 }[
+    match[2].toLowerCase() as "m" | "h" | "d" | "w"
+  ];
+  return Number(match[1]) * multiplier;
+}
+
+export function reconcileContiguousOpen(previous: Candle | undefined, next: Candle): Candle {
+  if (!previous || previous.symbol !== next.symbol || previous.timeframe !== next.timeframe) return next;
+  const previousTimestamp = Date.parse(previous.timestamp);
+  const nextTimestamp = Date.parse(next.timestamp);
+  const duration = timeframeDurationMilliseconds(next.timeframe, previousTimestamp);
+  if (!duration || nextTimestamp !== previousTimestamp + duration || next.open === previous.close) return next;
+  return {
+    ...next,
+    open: previous.close,
+    high: Math.max(next.high, previous.close),
+    low: Math.min(next.low, previous.close),
   };
-  return [...candles.slice(0, -1), synchronized];
 }

@@ -20,7 +20,22 @@ const TIMEFRAME_SECONDS: Record<string, number> = {
   "2h": 7200,
   "4h": 14400,
   "1d": 86400,
+  "2w": 1209600,
+  "1M": 2678400,
 };
+
+export function timeframeSeconds(timeframe: string): number {
+  const preset = TIMEFRAME_SECONDS[timeframe];
+  if (preset) return preset;
+  const match = /^([1-9][0-9]*)([mhdw])$/.exec(timeframe.trim().toLowerCase());
+  if (!match) throw new Error(`Unsupported candle timeframe: ${timeframe}`);
+  const multiplier = { m: 60, h: 3600, d: 86400, w: 604800 }[
+    match[2] as "m" | "h" | "d" | "w"
+  ];
+  const seconds = Number(match[1]) * multiplier;
+  if (seconds > 2678400) throw new Error(`Unsupported candle timeframe: ${timeframe}`);
+  return seconds;
+}
 
 export type CandleRequest = {
   symbol: string;
@@ -66,11 +81,19 @@ export function recentCandleRequest(
   nowMilliseconds = Date.now(),
   candleCount = 120,
 ): CandleRequest {
-  const interval = TIMEFRAME_SECONDS[timeframe];
-  if (!interval) {
-    throw new Error(`Unsupported candle timeframe: ${timeframe}`);
+  if (timeframe === "1M") {
+    const now = new Date(nowMilliseconds);
+    return {
+      symbol,
+      timeframe,
+      start: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - candleCount, 1)),
+      end: now,
+    };
   }
-  const endSeconds = Math.floor(nowMilliseconds / 1000 / interval) * interval;
+  const interval = timeframeSeconds(timeframe);
+  const anchorSeconds = timeframe.endsWith("w") ? Date.UTC(1970, 0, 5) / 1000 : 0;
+  const endSeconds =
+    Math.floor((nowMilliseconds / 1000 - anchorSeconds) / interval) * interval + anchorSeconds;
   return {
     symbol,
     timeframe,

@@ -34,7 +34,9 @@ class FakeRepository:
         self, candles: list[Candle] | None = None, symbol_exists: bool = True
     ) -> None:
         self.symbol_id = uuid.uuid4() if symbol_exists else None
-        self.candles = {candle.timestamp: candle for candle in candles or []}
+        self.candles = {
+            (candle.timeframe, candle.timestamp): candle for candle in candles or []
+        }
         self.upserted: list[Candle] = []
         self.commits = 0
 
@@ -54,15 +56,17 @@ class FakeRepository:
         return sorted(
             [
                 candle
-                for timestamp, candle in self.candles.items()
-                if start <= timestamp < end
+                for (stored_timeframe, timestamp), candle in self.candles.items()
+                if stored_timeframe == timeframe and start <= timestamp < end
             ],
             key=lambda candle: candle.timestamp,
         )
 
     async def upsert_many(self, symbol_id: uuid.UUID, candles: list[Candle]) -> None:
         self.upserted = candles
-        self.candles.update({candle.timestamp: candle for candle in candles})
+        self.candles.update(
+            {(candle.timeframe, candle.timestamp): candle for candle in candles}
+        )
 
     async def commit(self) -> None:
         self.commits += 1
@@ -73,6 +77,7 @@ class FakeProvider:
         self.candles = candles
         self.exchange = exchange
         self.calls = 0
+        self.requested_timeframes: list[str] = []
 
     async def get_symbols(self):
         return []
@@ -88,6 +93,7 @@ class FakeProvider:
         end: datetime,
     ) -> list[Candle]:
         self.calls += 1
+        self.requested_timeframes.append(timeframe)
         return self.candles
 
 
@@ -178,3 +184,19 @@ async def test_rejects_symbol_that_is_not_registered() -> None:
             datetime(2024, 6, 19, 8, 0, tzinfo=UTC),
             datetime(2024, 6, 19, 9, 0, tzinfo=UTC),
         )
+
+
+@pytest.mark.anyio
+async def test_aggregates_unsupported_oanda_timeframe_from_direct_base() -> None:
+    start = datetime(2024, 6, 19, 8, 0, tzinfo=UTC)
+    source = [make_candle(start + timedelta(minutes=index)) for index in range(6)]
+    repository = FakeRepository()
+    provider = FakeProvider(source, exchange="oanda")
+    service = CandleStorageService(repository, provider)
+
+    result = await service.get_candles("XAUUSD", "3m", start, start + timedelta(minutes=6))
+
+    assert provider.requested_timeframes == ["1m"]
+    assert [candle.timeframe for candle in result] == ["3m", "3m"]
+    assert [candle.timestamp for candle in result] == [start, start + timedelta(minutes=3)]
+    assert repository.commits == 2

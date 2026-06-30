@@ -4,6 +4,7 @@ import type {
   MultiTimeframeWindow,
   MultiTimeframeWindowCount,
 } from "@trading-framework/shared";
+import { normalizeChartTimeframe } from "./timeframe-options.ts";
 
 export type {
   MultiTimeframeLayout,
@@ -15,13 +16,18 @@ export type {
 export const MULTI_TIMEFRAME_WINDOW_COUNTS = [1, 2, 4, 8] as const;
 export const MULTI_TIMEFRAME_TIMEFRAMES = [
   "1m",
+  "3m",
   "5m",
   "15m",
   "30m",
+  "45m",
   "1h",
   "2h",
+  "3h",
   "4h",
   "1d",
+  "2w",
+  "1M",
 ] as const;
 
 export type MultiTimeframeReviewProgress = {
@@ -179,7 +185,8 @@ export function resolveMultiTimeframeLayout(
     if (
       !id ||
       ids.has(id) ||
-      !MULTI_TIMEFRAME_TIMEFRAMES.some((timeframe) => timeframe === window.timeframe) ||
+      typeof window.timeframe !== "string" ||
+      normalizeChartTimeframe(window.timeframe) === null ||
       typeof window.enabled !== "boolean" ||
       typeof window.reviewChecked !== "boolean"
     ) {
@@ -188,7 +195,7 @@ export function resolveMultiTimeframeLayout(
     ids.add(id);
     normalizedWindows.push({
       id,
-      timeframe: window.timeframe as MultiTimeframeTimeframe,
+      timeframe: normalizeChartTimeframe(window.timeframe) as MultiTimeframeTimeframe,
       enabled: window.enabled,
       reviewChecked: window.reviewChecked,
     });

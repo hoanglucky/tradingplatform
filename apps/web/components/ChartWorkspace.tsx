@@ -13,6 +13,7 @@ import {
   serializeMultiTimeframeLayout,
   updateMultiTimeframeSymbol,
   updateMultiTimeframeWindow,
+  visibleMultiTimeframeWindows,
   type MultiTimeframeTimeframe,
 } from "../lib/multi-timeframe";
 import {
@@ -23,9 +24,14 @@ import {
   type UserSettingsPatch,
 } from "../lib/user-settings";
 import { MultiTimeframeGrid } from "./MultiTimeframeGrid";
+import { TimeframeSelector } from "./TimeframeSelector";
+import { useStoredString } from "../lib/collapsible-layout";
+import { parseStoredTimeframeFavorites } from "../lib/timeframe-options";
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 const CHART_TIMEZONES = ["UTC", "Asia/Bangkok"] as const;
+const TIMEFRAME_FAVORITES_KEY = "trading-framework:timeframe-favorites";
+const DEFAULT_FAVORITES_JSON = JSON.stringify(["1m", "5m", "15m", "30m", "1h", "2h", "4h", "1d"]);
 
 const SYMBOLS = [
   { value: "BTCUSDT", label: "BTC / USDT", provider: "Binance" },
@@ -46,10 +52,15 @@ export function ChartWorkspace({ initialSymbol }: { initialSymbol?: string }) {
     : "BTCUSDT";
   const [symbol, setSymbol] = useState(normalizedInitialSymbol);
   const [refreshVersion, setRefreshVersion] = useState(0);
-  const [latestPrice, setLatestPrice] = useState<number | null>(null);
+  const [activeWindowId, setActiveWindowId] = useState("w1");
   const [timezone, setTimezone] = useState<string>("UTC");
   const [preferencesReady, setPreferencesReady] = useState(false);
   const [preferenceStatus, setPreferenceStatus] = useState<PreferenceStatus>("loading");
+  const [storedFavorites, setStoredFavorites] = useStoredString(
+    TIMEFRAME_FAVORITES_KEY,
+    DEFAULT_FAVORITES_JSON,
+  );
+  const timeframeFavorites = parseStoredTimeframeFavorites(storedFavorites);
   const [multiTimeframeLayout, setMultiTimeframeLayout] = useState(() =>
     createDefaultMultiTimeframeLayout(normalizedInitialSymbol),
   );
@@ -65,6 +76,9 @@ export function ChartWorkspace({ initialSymbol }: { initialSymbol?: string }) {
   const settingsSaveVersionRef = useRef(0);
   const selectedSymbol = SYMBOLS.find((item) => item.value === symbol) ?? SYMBOLS[0];
   const reviewProgress = getMultiTimeframeReviewProgress(multiTimeframeLayout);
+  const visibleWindows = visibleMultiTimeframeWindows(multiTimeframeLayout);
+  const activeWindow =
+    visibleWindows.find((window) => window.id === activeWindowId) ?? visibleWindows[0];
 
   useEffect(() => {
     const controller = new AbortController();
@@ -91,13 +105,13 @@ export function ChartWorkspace({ initialSymbol }: { initialSymbol?: string }) {
         persistedTimezoneRef.current = settings.timezone;
         setSymbol(effectivePreferences.symbol);
         setTimezone(settings.timezone);
-        setMultiTimeframeLayout(
-          resolveMultiTimeframeLayout(
-            settings.multi_timeframe_layout,
-            effectivePreferences.symbol,
-            supportedSymbols,
-          ),
+        const resolvedLayout = resolveMultiTimeframeLayout(
+          settings.multi_timeframe_layout,
+          effectivePreferences.symbol,
+          supportedSymbols,
         );
+        setMultiTimeframeLayout(resolvedLayout);
+        setActiveWindowId(visibleMultiTimeframeWindows(resolvedLayout)[0]?.id ?? "w1");
         setPreferenceStatus("ready");
       })
       .catch(() => {
@@ -152,12 +166,14 @@ export function ChartWorkspace({ initialSymbol }: { initialSymbol?: string }) {
   }, [multiTimeframeLayout, preferencesReady, symbol, timezone]);
 
   function selectSymbol(nextSymbol: string) {
-    setLatestPrice(null);
     setMultiTimeframeLayout((current) => updateMultiTimeframeSymbol(current, nextSymbol));
     setSymbol(nextSymbol);
   }
 
   function selectReviewWindowCount(windowCount: (typeof MULTI_TIMEFRAME_WINDOW_COUNTS)[number]) {
+    if (!visibleWindows.slice(0, windowCount).some((window) => window.id === activeWindowId)) {
+      setActiveWindowId(visibleWindows[0]?.id ?? "w1");
+    }
     setMultiTimeframeLayout((current) => resizeMultiTimeframeLayout(current, windowCount));
   }
 
@@ -171,6 +187,13 @@ export function ChartWorkspace({ initialSymbol }: { initialSymbol?: string }) {
     setMultiTimeframeLayout((current) =>
       updateMultiTimeframeWindow(current, windowId, { reviewChecked }),
     );
+  }
+
+  function toggleTimeframeFavorite(timeframe: string) {
+    const next = timeframeFavorites.includes(timeframe)
+      ? timeframeFavorites.filter((item) => item !== timeframe)
+      : [...timeframeFavorites, timeframe];
+    setStoredFavorites(JSON.stringify(next));
   }
 
   return (
@@ -199,30 +222,32 @@ export function ChartWorkspace({ initialSymbol }: { initialSymbol?: string }) {
                 : ""}
           </small>
         </label>
-        <label className="chart-timezone-control">
-          <span>Chart timezone</span>
-          <select value={timezone} onChange={(event) => setTimezone(event.target.value)}>
-            {CHART_TIMEZONES.map((item) => (
-              <option key={item} value={item}>
-                {item === "Asia/Bangkok" ? "Bangkok (UTC+7)" : "UTC"}
-              </option>
+        <TimeframeSelector
+          activeTimeframe={activeWindow?.timeframe ?? "1m"}
+          favorites={timeframeFavorites}
+          onSelect={(item) => {
+            if (activeWindow) selectReviewTimeframe(activeWindow.id, item);
+          }}
+          onToggleFavorite={toggleTimeframeFavorite}
+        />
+        <div className="workspace-layout-control">
+          <span>Windows</span>
+          <div className="review-layout-selector" aria-label="Window count">
+            {MULTI_TIMEFRAME_WINDOW_COUNTS.map((windowCount) => (
+              <button
+                key={windowCount}
+                type="button"
+                className={multiTimeframeLayout.windowCount === windowCount ? "is-active" : undefined}
+                aria-pressed={multiTimeframeLayout.windowCount === windowCount}
+                aria-label={`${windowCount} chart ${windowCount === 1 ? "window" : "windows"}`}
+                onClick={() => selectReviewWindowCount(windowCount)}
+              >
+                {windowCount}
+              </button>
             ))}
-          </select>
-          <small>Candle open time</small>
-        </label>
-        <div className="chart-market-summary">
-          <div className="chart-quote">
-            <span>Realtime price</span>
-            <strong>
-              {latestPrice === null
-                ? "—"
-                : latestPrice.toLocaleString("en-US", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 5,
-                  })}
-            </strong>
-            <small>{selectedSymbol.label}</small>
           </div>
+        </div>
+        <div className="workspace-toolbar-actions">
           <button
             type="button"
             className="chart-refresh-button"
@@ -232,58 +257,46 @@ export function ChartWorkspace({ initialSymbol }: { initialSymbol?: string }) {
           >
             <RefreshCw aria-hidden="true" size={17} />
           </button>
-        </div>
-      </header>
-
-      <section className="review-workspace-toolbar" aria-label="Multi-timeframe review layout">
-        <div className="review-workspace-title">
-          <span>Review layout</span>
-          <strong>{multiTimeframeLayout.symbol}</strong>
-        </div>
-        <div className="review-layout-selector" aria-label="Window count">
-          {MULTI_TIMEFRAME_WINDOW_COUNTS.map((windowCount) => (
-            <button
-              key={windowCount}
-              type="button"
-              className={multiTimeframeLayout.windowCount === windowCount ? "is-active" : undefined}
-              aria-pressed={multiTimeframeLayout.windowCount === windowCount}
-              aria-label={`${windowCount} chart ${windowCount === 1 ? "window" : "windows"}`}
-              onClick={() => selectReviewWindowCount(windowCount)}
-            >
-              {windowCount}
-            </button>
-          ))}
-        </div>
-        <div className="review-workspace-progress">
-          <strong aria-live="polite">
-            Reviewed {reviewProgress.reviewed}/{reviewProgress.total} timeframes
-          </strong>
           <button
             type="button"
+            className="review-clear-button"
             onClick={() => setMultiTimeframeLayout((current) => clearMultiTimeframeReview(current))}
             disabled={reviewProgress.reviewed === 0}
+            title="Clear reviewed timeframes"
           >
-            <RotateCcw size={14} aria-hidden="true" />
-            <span>Clear review</span>
+            <RotateCcw size={16} aria-hidden="true" />
           </button>
         </div>
-      </section>
+      </header>
 
       <MultiTimeframeGrid
         layout={multiTimeframeLayout}
         timezone={timezone}
         refreshVersion={refreshVersion}
-        onLatestPriceChange={setLatestPrice}
+        activeWindowId={activeWindow?.id ?? "w1"}
+        onActiveWindowChange={setActiveWindowId}
         onTimeframeChange={selectReviewTimeframe}
         onReviewChange={setReviewChecked}
       />
 
-      <p className="chart-attribution">
-        Charts by{" "}
-        <a href="https://www.tradingview.com" target="_blank" rel="noreferrer">
-          TradingView
-        </a>
-      </p>
+      <footer className="chart-footer">
+        <p className="chart-attribution">
+          Charts by{" "}
+          <a href="https://www.tradingview.com" target="_blank" rel="noreferrer">
+            TradingView
+          </a>
+        </p>
+        <label className="chart-timezone-control">
+          <span>Timezone</span>
+          <select value={timezone} onChange={(event) => setTimezone(event.target.value)}>
+            {CHART_TIMEZONES.map((item) => (
+              <option key={item} value={item}>
+                {item === "Asia/Bangkok" ? "Bangkok (UTC+7)" : "UTC"}
+              </option>
+            ))}
+          </select>
+        </label>
+      </footer>
     </>
   );
 }

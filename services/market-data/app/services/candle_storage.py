@@ -5,8 +5,11 @@ from datetime import datetime, timedelta
 from typing import Protocol
 
 from app.providers import MarketDataProvider
+from app.candle_aggregator import aggregate_candles
+from app.provider_capabilities import provider_supports_direct_timeframe
 from app.schemas import Candle
 from app.storage.candles import SymbolNotFoundError
+from app.timeframes import parse_timeframe
 
 TIMEFRAME_DURATION = {
     "1m": timedelta(minutes=1),
@@ -23,6 +26,8 @@ TIMEFRAME_DURATION = {
     "1d": timedelta(days=1),
     "3d": timedelta(days=3),
     "1w": timedelta(weeks=1),
+    "2w": timedelta(weeks=2),
+    "1M": timedelta(days=31),
 }
 
 
@@ -62,6 +67,8 @@ class CandleStorageService:
         end: datetime,
     ) -> list[Candle]:
         exchange = getattr(self.provider, "exchange", None)
+        target = parse_timeframe(timeframe)
+        timeframe = target.value
         symbol_id = await self.repository.get_symbol_id(symbol, exchange)
         if symbol_id is None:
             raise SymbolNotFoundError(f"Symbol {symbol.upper()} is not registered.")
@@ -72,9 +79,19 @@ class CandleStorageService:
         if self._cache_covers_range(cached, timeframe, start, end, exchange):
             return cached
 
-        fetched = await self.provider.get_historical_candles(
-            symbol, timeframe, start, end
-        )
+        if provider_supports_direct_timeframe(str(exchange), timeframe):
+            fetched = await self.provider.get_historical_candles(
+                symbol, timeframe, start, end
+            )
+        else:
+            base_timeframe = self._aggregation_base_timeframe(str(exchange), timeframe)
+            base_candles = await self.get_candles(
+                symbol, base_timeframe, start, end
+            )
+            fetched = [
+                Candle.model_validate(candle.model_dump(exclude={"closed", "partial"}))
+                for candle in aggregate_candles(base_candles, timeframe)
+            ]
         unique = list({candle.timestamp: candle for candle in fetched}.values())
         unique.sort(key=lambda candle: candle.timestamp)
         await self.repository.upsert_many(symbol_id, unique)
@@ -85,6 +102,24 @@ class CandleStorageService:
         )
 
     @staticmethod
+    def _aggregation_base_timeframe(exchange: str, target_timeframe: str) -> str:
+        target = parse_timeframe(target_timeframe)
+        candidates = (
+            ("1d", "4h", "2h", "1h", "30m", "15m", "5m", "3m", "1m")
+            if exchange == "binance"
+            else ("1d", "4h", "2h", "1h", "30m", "15m", "5m", "1m")
+        )
+        for candidate in candidates:
+            parsed = parse_timeframe(candidate)
+            if (
+                parsed.duration_milliseconds <= target.duration_milliseconds
+                and target.duration_milliseconds % parsed.duration_milliseconds == 0
+                and provider_supports_direct_timeframe(exchange, candidate)
+            ):
+                return candidate
+        raise ValueError(f"No aggregation base timeframe is available for {target_timeframe}.")
+
+    @staticmethod
     def _cache_covers_range(
         candles: list[Candle],
         timeframe: str,
@@ -93,6 +128,13 @@ class CandleStorageService:
         exchange: str | None = None,
     ) -> bool:
         duration = TIMEFRAME_DURATION.get(timeframe)
+        if duration is None:
+            try:
+                duration = timedelta(
+                    milliseconds=parse_timeframe(timeframe).duration_milliseconds
+                )
+            except ValueError:
+                return False
         if not candles or duration is None:
             return False
         leading_tolerance = timedelta(days=3) if exchange == "oanda" else duration

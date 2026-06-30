@@ -121,6 +121,10 @@ Each `CandlestickChart` owns its viewport controls. Right-clicking a loaded canv
 
 Provider candle timestamps remain timezone-aware UTC opening instants in transport, storage, and Lightweight Charts coordinates. Time-axis ticks and crosshair labels format that opening instant using the persisted IANA chart timezone, currently selectable between UTC and Asia/Bangkok. A closing instant may be derived by adding the timeframe duration, but it does not shift the candle coordinate; this matches TradingView's convention where a 5m candle opened at 14:55 is selected as 14:55 rather than 15:00.
 
+The time axis intentionally samples text labels according to available width, so adjacent labels can read 15:00 and 15:05 even when all intervening 1m bars exist. A chart overlay follows the crosshair and displays the inspected candle's full opening-to-closing range based on its timeframe, such as `5m 15:00 - 15:05`, making bucket coverage explicit without forcing overlapping axis text.
+
+The workspace uses one compact control row ordered by symbol, active-window timeframe, layout count, and actions. Pointer or keyboard focus selects a chart window, and the top timeframe buttons then update that window; local timeframe selects remain available in every chart. Numeric realtime summaries are omitted while candle synchronization continues internally. Axis ticks use `HH:mm` only, and the persisted timezone control sits in the bottom-right chart footer.
+
 Custom timeframe work begins with pure parser and aggregation utilities in the market-data service. The parser canonicalizes positive integer minute/hour/day strings and exposes duration milliseconds without knowing providers, storage, or HTTP. `CandleAggregator` sorts source candles and groups them into Unix-epoch-aligned UTC buckets, producing deterministic OHLCV values with the bucket start as the timestamp. It requires one symbol, one source timeframe, and an exact target/source duration multiple.
 
 Aggregated output uses an `AggregatedCandle` contract with complementary `closed` and `partial` flags. Bucket state is deterministic against a timezone-aware evaluation instant: a bucket is closed when its UTC end is at or before that instant. Chart consumers can retain the active partial candle, while backtest/replay consumers call the same utility with partial output excluded. Provider capability routing, API acceptance, persistence, and cache integration remain separate later stages, so existing `/market/candles` behavior is unchanged.
@@ -190,3 +194,9 @@ The Docker Compose setup is intended for local development. A production deploym
 - Service-level health checks and metrics.
 - Centralized logs and traces.
 - CI gates for tests, type checks, and container builds.
+
+## Frontend Workspace Shell
+
+The web shell owns a collapsible primary navigation rail. The chart route adds an independent market watchlist rail on the right, leaving the chart workspace as the flexible center column. Collapse preferences are browser-local presentation state and do not affect API user settings, market subscriptions, or trading safety controls.
+
+Timeframe favorites are also browser-local presentation state. Selected custom timeframes are part of the persisted multi-window API layout. Provider-native timeframes use realtime WebSockets; aggregate-only timeframes periodically read the candle API while the chart is visible. Market-data storage builds unsupported fixed intervals from the largest compatible native base and caches the aggregate result; `1M` uses UTC calendar-month boundaries.

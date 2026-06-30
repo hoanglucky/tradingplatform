@@ -69,7 +69,7 @@ export type Watchlist = {
 };
 
 export type MultiTimeframeWindowCount = 1 | 2 | 4 | 8;
-export type MultiTimeframeTimeframe = "1m" | "5m" | "15m" | "30m" | "1h" | "2h" | "4h" | "1d";
+export type MultiTimeframeTimeframe = string;
 
 export type MultiTimeframeWindow = {
   id: string;

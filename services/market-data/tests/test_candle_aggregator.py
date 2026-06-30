@@ -76,13 +76,32 @@ def test_empty_input_returns_empty_output() -> None:
 
 def test_normalizes_source_and_target_timeframes() -> None:
     candles = [
-        candle.model_copy(update={"timeframe": " 1M "}) for candle in make_candles(5)
+        candle.model_copy(update={"timeframe": " 1m "}) for candle in make_candles(5)
     ]
 
     result = aggregate_candles(candles, " 5M ")
 
     assert len(result) == 1
     assert result[0].timeframe == "5m"
+
+
+def test_week_buckets_start_on_monday_utc() -> None:
+    candles = [
+        Candle(
+            symbol="BTCUSDT",
+            timeframe="1d",
+            timestamp=datetime(2026, 6, 30, tzinfo=UTC),
+            open=Decimal("100"),
+            high=Decimal("101"),
+            low=Decimal("99"),
+            close=Decimal("100"),
+            volume=Decimal("1"),
+        )
+    ]
+
+    result = aggregate_candles(candles, "2w")
+
+    assert result[0].timestamp.weekday() == 0
 
 
 def test_marks_completed_and_active_buckets() -> None:

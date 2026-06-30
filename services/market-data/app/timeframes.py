@@ -4,12 +4,14 @@ import re
 from dataclasses import dataclass
 from typing import Literal
 
-TimeframeUnit = Literal["m", "h", "d"]
-TIMEFRAME_PATTERN = re.compile(r"^([1-9][0-9]*)([mhd])$")
+TimeframeUnit = Literal["m", "h", "d", "w", "M"]
+TIMEFRAME_PATTERN = re.compile(r"^([1-9][0-9]*)([mhdw])$", re.IGNORECASE)
 UNIT_MILLISECONDS: dict[TimeframeUnit, int] = {
     "m": 60_000,
     "h": 3_600_000,
     "d": 86_400_000,
+    "w": 604_800_000,
+    "M": 2_678_400_000,
 }
 MAX_TIMEFRAME_MILLISECONDS = 31 * UNIT_MILLISECONDS["d"]
 
@@ -29,11 +31,19 @@ class ParsedTimeframe:
 def parse_timeframe(value: str) -> ParsedTimeframe:
     if not isinstance(value, str):
         raise TimeframeValidationError("Timeframe must be a string.")
-    normalized = value.strip().lower()
+    candidate = value.strip()
+    if candidate == "1M":
+        return ParsedTimeframe(
+            value="1M",
+            amount=1,
+            unit="M",
+            duration_milliseconds=UNIT_MILLISECONDS["M"],
+        )
+    normalized = candidate.lower()
     match = TIMEFRAME_PATTERN.fullmatch(normalized)
     if match is None:
         raise TimeframeValidationError(
-            "Timeframe must be a positive integer followed by m, h, or d."
+            "Timeframe must be a positive integer followed by m, h, d, or w; 1M means one month."
         )
 
     amount = int(match.group(1))

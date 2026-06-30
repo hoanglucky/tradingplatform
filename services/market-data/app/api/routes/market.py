@@ -21,6 +21,7 @@ from app.providers import MarketDataProvider
 from app.schemas import Candle
 from app.services.candle_storage import CandleStorageService
 from app.storage.candles import CandleRepository, SymbolNotFoundError
+from app.timeframes import TimeframeValidationError, normalize_timeframe
 from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter()
@@ -49,10 +50,11 @@ async def get_market_candles(
     service: CandleStorageService = Depends(get_candle_storage_service),
 ) -> list[Candle]:
     try:
+        timeframe = normalize_timeframe(timeframe)
         return await service.get_candles(symbol, timeframe, start, end)
     except SymbolNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    except (BinanceValidationError, OandaValidationError) as exc:
+    except (BinanceValidationError, OandaValidationError, TimeframeValidationError, ValueError) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except OandaConfigurationError as exc:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc

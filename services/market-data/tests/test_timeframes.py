@@ -23,6 +23,8 @@ from app.timeframes import (
         ("2h", 7_200_000),
         ("4h", 14_400_000),
         ("1d", 86_400_000),
+        ("2w", 1_209_600_000),
+        ("1M", 2_678_400_000),
     ],
 )
 def test_parses_supported_timeframe_units(
@@ -46,7 +48,7 @@ def test_normalizes_whitespace_and_unit_case() -> None:
 
 @pytest.mark.parametrize(
     "value",
-    ["", "0m", "-5m", "abc", "1x", "1.5h", "m5", "32d"],
+    ["", "0m", "-5m", "abc", "1x", "1.5h", "m5", "32d", "5w"],
 )
 def test_rejects_invalid_or_unsafe_timeframes(value: str) -> None:
     with pytest.raises(TimeframeValidationError):

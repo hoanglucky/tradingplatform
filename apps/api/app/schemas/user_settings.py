@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 Timeframe = Literal["1m", "5m", "15m", "1h", "4h", "1d"]
 Theme = Literal["light", "dark", "system"]
 INDICATOR_PATTERN = re.compile(r"^[a-z][a-z0-9_-]{0,31}$")
-ReviewTimeframe = Literal["1m", "5m", "15m", "30m", "1h", "2h", "4h", "1d"]
+ReviewTimeframe = str
 WindowCount = Literal[1, 2, 4, 8]
 
 
@@ -19,9 +19,25 @@ class MultiTimeframeWindow(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     id: str = Field(min_length=1, max_length=32, pattern=r"^[A-Za-z0-9_-]+$")
-    timeframe: ReviewTimeframe
+    timeframe: ReviewTimeframe = Field(min_length=2, max_length=16)
     enabled: bool
     reviewChecked: bool
+
+    @field_validator("timeframe")
+    @classmethod
+    def validate_timeframe(cls, value: str) -> str:
+        candidate = value.strip()
+        if candidate == "1M":
+            return candidate
+        match = re.fullmatch(r"([1-9][0-9]*)([mhdw])", candidate.lower())
+        if match is None:
+            raise ValueError("Invalid chart timeframe.")
+        amount = int(match.group(1))
+        unit = match.group(2)
+        days = amount * {"m": 1 / 1440, "h": 1 / 24, "d": 1, "w": 7}[unit]
+        if days > 31:
+            raise ValueError("Chart timeframe cannot exceed one month.")
+        return f"{amount}{unit}"
 
 
 class MultiTimeframeLayout(BaseModel):

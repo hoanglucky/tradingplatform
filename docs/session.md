@@ -1524,8 +1524,11 @@ Implement Day 28.
 ### Verification performed
 
 - Corrected an earlier duration offset that displayed a 14:55 candle as 15:00 when selected.
+- Verified the live 1m API contains every candle from 15:00 through 15:05; only axis labels were sampled.
+- Added an exact candle timestamp overlay driven by crosshair movement for every chart window.
+- Expanded the overlay to show the full bucket range for all preset timeframes.
 - Tests cover unchanged provider-open coordinates, derived close calculations, UTC/Bangkok formatting, and invalid timestamps/timeframes.
-- `npm run web-test` passed lint, 45 tests, typecheck, and production build.
+- `npm run web-test` passed lint, 46 tests, typecheck, and production build.
 
 ### Safety notes
 
@@ -1599,3 +1602,113 @@ Implement Day 28.
 ### Safety notes
 
 - Every provider remains explicitly read-only; no account or order behavior was added.
+
+## 2026-06-30 - Day 30.9.3 chart workspace control layout polish
+
+### Work completed
+
+- Consolidated chart controls into one symbol → timeframe → windows → actions toolbar.
+- Added active-window selection for shared timeframe buttons while preserving local selectors.
+- Removed global and per-window numeric realtime price displays.
+- Moved timezone to the bottom-right footer and kept settings persistence.
+- Simplified axis tick labels to `HH:mm` and retained full crosshair candle ranges.
+- Added responsive toolbar and footer behavior for mobile layouts.
+
+### Verification performed
+
+- Frontend lint passed.
+- All 46 frontend tests passed.
+- TypeScript and production build passed.
+
+### Safety notes
+
+- Realtime synchronization remains read-only and unchanged; no trading behavior was added.
+
+## 2026-06-30 - Day 30.9.4 collapsible chart navigation sidebars
+
+### Work completed
+
+- Added an icon-based primary navigation that collapses toward the left edge.
+- Added active-route styling, keyboard focus treatment, and collapsed tooltips.
+- Converted the chart watchlist into a right-side market rail with its own collapse control.
+- Made the center chart grid expand when either sidebar is collapsed.
+- Persisted both independent states in local storage through `useSyncExternalStore`.
+- Added responsive fallbacks for the market rail on narrow screens.
+
+### Verification performed
+
+- Frontend lint passed.
+- All 46 frontend tests passed.
+- TypeScript, diff check, and production build passed.
+
+### Safety notes
+
+- This is frontend layout state only; market access remains read-only and no trading behavior changed.
+
+## 2026-06-30 - Day 30.9.5 automatic chart recovery after browser pause
+
+### Work completed
+
+- Added automatic chart recovery when the document becomes visible, the window regains focus, or the browser returns online.
+- Refetches the recent authoritative range for all visible timeframes to fill candles missed during browser throttling.
+- Recreates every active WebSocket subscription after recovery.
+- Debounces duplicate browser resume events and retains existing candles while backfill runs.
+
+### Verification performed
+
+- Added a unit test for hidden, debounced, and eligible visible recovery states.
+- Frontend lint, tests, typecheck, and production build are required before deployment.
+
+### Safety notes
+
+- Recovery is read-only market-data synchronization and adds no trading or exchange-write path.
+
+## 2026-06-30 - Days 30.14–30.18 custom timeframe and favorites
+
+### Work completed
+
+- Connected direct-versus-aggregate timeframe routing to candle storage.
+- Added cached aggregation fallback from compatible provider-native base candles.
+- Added week support and calendar-month `1M` aggregation.
+- Allowed safe custom timeframe values through `/market/candles` and persisted chart layouts.
+- Added a grouped timeframe dropdown with custom input and star favorites.
+- Toolbar buttons now reflect the saved favorite list.
+- Added 10-second visible-tab REST sync for aggregate-only timeframes while direct intervals retain WebSocket updates.
+
+### Verification performed
+
+- 93 market-data tests passed.
+- 57 API tests passed.
+- 52 frontend tests, lint, typecheck, and production build passed.
+
+### Remaining follow-up
+
+- Add source/aggregation response metadata and the `Aggregated from …` window label.
+
+### Safety notes
+
+- All provider operations remain read-only; no live trading or exchange write was introduced.
+
+## 2026-06-30 - Day 30.9.6 realtime candle open continuity repair
+
+### Root cause
+
+- A shared latest price from any active timeframe was mutating the final candle's close/high/low in every chart.
+- Only the latest realtime candle was retained, so a previous live bucket could disappear before REST backfill.
+- Reload appeared correct because authoritative historical candles replaced the temporary frontend state.
+
+### Work completed
+
+- Removed cross-timeframe OHLC synchronization.
+- Added bounded per-symbol/timeframe realtime candle buffers.
+- Reconciled exactly contiguous next-candle opens to the previous close while preserving genuine market gaps.
+- Applied duration handling across standard and custom minute/hour/day/week/month values.
+
+### Verification performed
+
+- Added transition, real-gap, multi-timeframe, and consecutive-buffer regression tests.
+- 55 frontend tests, lint, typecheck, and production build passed.
+
+### Safety notes
+
+- This only corrects read-only chart rendering; provider storage and trading behavior are unchanged.

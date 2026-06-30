@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { fetchMarketCandles, recentCandleRequest } from "../lib/market-candles.ts";
+import { fetchMarketCandles, recentCandleRequest, timeframeSeconds } from "../lib/market-candles.ts";
 
 test("builds an aligned recent candle range for extended timeframes", () => {
   const now = Date.UTC(2026, 5, 30, 10, 45);
@@ -9,6 +9,23 @@ test("builds an aligned recent candle range for extended timeframes", () => {
 
   assert.equal(request.end.toISOString(), "2026-06-30T10:00:00.000Z");
   assert.equal(request.end.getTime() - request.start.getTime(), 120 * 2 * 60 * 60 * 1000);
+});
+
+test("calculates custom week and month timeframe durations", () => {
+  assert.equal(timeframeSeconds("45m"), 2700);
+  assert.equal(timeframeSeconds("3h"), 10800);
+  assert.equal(timeframeSeconds("2w"), 1209600);
+  assert.equal(timeframeSeconds("1M"), 2678400);
+});
+
+test("aligns week ranges to Monday and month ranges to calendar boundaries", () => {
+  const now = Date.parse("2026-06-30T12:34:00Z");
+  const weekly = recentCandleRequest("XAUUSD", "2w", now, 2);
+  const monthly = recentCandleRequest("XAUUSD", "1M", now, 2);
+
+  assert.equal(weekly.end.getUTCDay(), 1);
+  assert.equal(monthly.start.toISOString(), "2026-04-01T00:00:00.000Z");
+  assert.equal(monthly.end.toISOString(), "2026-06-30T12:34:00.000Z");
 });
 
 test("fetches and normalizes candles through the shared client", async (context) => {

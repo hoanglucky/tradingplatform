@@ -15,9 +15,10 @@ import {
   getReconnectDelay,
   mergeRealtimeCandle,
   normalizeRealtimeCandle,
-  synchronizeLatestCandlePrice,
+  shouldResumeMarketData,
 } from "../lib/market-stream";
 import { CandlestickChart } from "./CandlestickChart";
+import { supportsRealtimeTimeframe } from "../lib/timeframe-options";
 
 const marketDataBaseUrl = process.env.NEXT_PUBLIC_MARKET_DATA_BASE_URL ?? "http://localhost:8101";
 const marketWebSocketUrl = process.env.NEXT_PUBLIC_MARKET_WS_URL ?? "ws://localhost:8000/ws/market";
@@ -30,13 +31,14 @@ function positiveNumber(value: string | undefined, fallback: number): number {
 const reconnectBaseMs = positiveNumber(process.env.NEXT_PUBLIC_MARKET_WS_RECONNECT_MS, 1000);
 const reconnectMaxMs = positiveNumber(process.env.NEXT_PUBLIC_MARKET_WS_MAX_RECONNECT_MS, 15000);
 
-type RealtimeStatus = "connecting" | "connected" | "reconnecting" | "source-reconnecting" | "error";
+type RealtimeStatus = "connecting" | "connected" | "reconnecting" | "source-reconnecting" | "polling" | "error";
 
 type MultiTimeframeGridProps = {
   layout: MultiTimeframeLayout;
   timezone: string;
   refreshVersion: number;
-  onLatestPriceChange: (price: number | null) => void;
+  activeWindowId: string;
+  onActiveWindowChange: (windowId: string) => void;
   onTimeframeChange: (windowId: string, timeframe: MultiTimeframeTimeframe) => void;
   onReviewChange: (windowId: string, reviewChecked: boolean) => void;
 };
@@ -46,10 +48,12 @@ type MultiTimeframeChartWindowProps = {
   timezone: string;
   reviewWindow: MultiTimeframeWindow;
   refreshVersion: number;
-  realtimeCandle?: Candle;
+  resumeVersion: number;
+  realtimeCandles?: Candle[];
   realtimeStatus: RealtimeStatus;
-  sharedLatestPrice: number | null;
   chartHeight: number;
+  active: boolean;
+  onActivate: () => void;
   onTimeframeChange: (windowId: string, timeframe: MultiTimeframeTimeframe) => void;
   onReviewChange: (windowId: string, reviewChecked: boolean) => void;
 };
@@ -58,6 +62,7 @@ function realtimeStatusLabel(status: RealtimeStatus): string {
   if (status === "connected") return "Live";
   if (status === "reconnecting" || status === "source-reconnecting") return "Reconnecting";
   if (status === "error") return "Stream unavailable";
+  if (status === "polling") return "Auto sync";
   return "Connecting";
 }
 
@@ -66,47 +71,53 @@ function MultiTimeframeChartWindow({
   timezone,
   reviewWindow,
   refreshVersion,
-  realtimeCandle,
+  resumeVersion,
+  realtimeCandles,
   realtimeStatus,
-  sharedLatestPrice,
   chartHeight,
+  active,
+  onActivate,
   onTimeframeChange,
   onReviewChange,
 }: MultiTimeframeChartWindowProps) {
   const [historicalCandles, setHistoricalCandles] = useState<Candle[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const realtimeCandleRef = useRef(realtimeCandle);
+  const realtimeCandlesRef = useRef(realtimeCandles);
+  const requestIdentityRef = useRef(`${symbol}:${reviewWindow.timeframe}`);
 
   useEffect(() => {
-    realtimeCandleRef.current = realtimeCandle;
-  }, [realtimeCandle]);
+    realtimeCandlesRef.current = realtimeCandles;
+  }, [realtimeCandles]);
 
-  const timeframeCandles = realtimeCandle
-    ? mergeRealtimeCandle(historicalCandles, realtimeCandle)
-    : historicalCandles;
-  const candles =
-    realtimeCandle && sharedLatestPrice !== null
-      ? synchronizeLatestCandlePrice(timeframeCandles, sharedLatestPrice)
-      : timeframeCandles;
-  const visibleError = realtimeCandle ? null : error;
+  const candles = (realtimeCandles ?? []).reduce(
+    (current, candle) => mergeRealtimeCandle(current, candle),
+    historicalCandles,
+  );
+  const visibleError = realtimeCandles?.length ? null : error;
 
   useEffect(() => {
     const controller = new AbortController();
 
     async function loadCandles() {
+      const requestIdentity = `${symbol}:${reviewWindow.timeframe}`;
+      const identityChanged = requestIdentityRef.current !== requestIdentity;
+      requestIdentityRef.current = requestIdentity;
       setLoading(true);
       setError(null);
-      setHistoricalCandles([]);
+      if (identityChanged) setHistoricalCandles([]);
       try {
         const historical = await fetchMarketCandles(
           marketDataBaseUrl,
           recentCandleRequest(symbol, reviewWindow.timeframe),
           controller.signal,
         );
-        const currentRealtime = realtimeCandleRef.current;
+        const currentRealtime = realtimeCandlesRef.current ?? [];
         setHistoricalCandles(
-          currentRealtime ? mergeRealtimeCandle(historical, currentRealtime) : historical,
+          currentRealtime.reduce(
+            (current, candle) => mergeRealtimeCandle(current, candle),
+            historical,
+          ),
         );
       } catch (requestError: unknown) {
         if (!controller.signal.aborted) {
@@ -121,27 +132,22 @@ function MultiTimeframeChartWindow({
 
     void loadCandles();
     return () => controller.abort();
-  }, [refreshVersion, reviewWindow.timeframe, symbol]);
+  }, [refreshVersion, resumeVersion, reviewWindow.timeframe, symbol]);
 
   return (
-    <article className="multi-timeframe-window" data-window-id={reviewWindow.id}>
+    <article
+      className={`multi-timeframe-window${active ? " is-active" : ""}`}
+      data-window-id={reviewWindow.id}
+      onPointerDown={onActivate}
+      onFocusCapture={onActivate}
+    >
       <header className="multi-timeframe-window-header">
         <div className="multi-timeframe-window-identity">
           <span>{symbol}</span>
           <strong>{reviewWindow.timeframe}</strong>
-        </div>
-        <div className="multi-timeframe-live-price">
-          <span className={realtimeStatus === "connected" ? "is-live" : undefined}>
+          <span className={`window-stream-status${realtimeStatus === "connected" ? " is-live" : ""}`}>
             {realtimeStatusLabel(realtimeStatus)}
           </span>
-          <strong>
-            {sharedLatestPrice === null
-              ? "—"
-              : sharedLatestPrice.toLocaleString("en-US", {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 5,
-                })}
-          </strong>
         </div>
         <label className="review-window-check">
           <input
@@ -160,6 +166,11 @@ function MultiTimeframeChartWindow({
             onTimeframeChange(reviewWindow.id, event.target.value as MultiTimeframeTimeframe)
           }
         >
+          {!MULTI_TIMEFRAME_TIMEFRAMES.includes(
+            reviewWindow.timeframe as (typeof MULTI_TIMEFRAME_TIMEFRAMES)[number],
+          ) ? (
+            <option value={reviewWindow.timeframe}>{reviewWindow.timeframe}</option>
+          ) : null}
           {MULTI_TIMEFRAME_TIMEFRAMES.map((timeframe) => (
             <option value={timeframe} key={timeframe}>
               {timeframe}
@@ -184,22 +195,52 @@ export function MultiTimeframeGrid({
   layout,
   timezone,
   refreshVersion,
-  onLatestPriceChange,
+  activeWindowId,
+  onActiveWindowChange,
   onTimeframeChange,
   onReviewChange,
 }: MultiTimeframeGridProps) {
   const visibleWindows = visibleMultiTimeframeWindows(layout);
   const realtimeTimeframes = uniqueVisibleMultiTimeframeTimeframes(layout);
-  const realtimeKey = realtimeTimeframes.join(",");
-  const [realtimeCandles, setRealtimeCandles] = useState<Record<string, Candle>>({});
+  const directRealtimeTimeframes = realtimeTimeframes.filter((timeframe) =>
+    supportsRealtimeTimeframe(layout.symbol, timeframe),
+  );
+  const realtimeKey = directRealtimeTimeframes.join(",");
+  const hasPollingTimeframes = directRealtimeTimeframes.length !== realtimeTimeframes.length;
+  const [realtimeCandles, setRealtimeCandles] = useState<Record<string, Candle[]>>({});
   const [realtimeStatuses, setRealtimeStatuses] = useState<Record<string, RealtimeStatus>>({});
-  const [sharedQuote, setSharedQuote] = useState<{ symbol: string; price: number } | null>(null);
-  const latestPriceChangeRef = useRef(onLatestPriceChange);
-  const sharedLatestPrice = sharedQuote?.symbol === layout.symbol ? sharedQuote.price : null;
+  const [resumeVersion, setResumeVersion] = useState(0);
+  const [pollVersion, setPollVersion] = useState(0);
 
   useEffect(() => {
-    latestPriceChangeRef.current = onLatestPriceChange;
-  }, [onLatestPriceChange]);
+    let lastResumeAt = 0;
+
+    function resynchronizeAfterPause() {
+      const now = Date.now();
+      if (!shouldResumeMarketData(document.visibilityState, lastResumeAt, now)) return;
+      lastResumeAt = now;
+      setResumeVersion((version) => version + 1);
+    }
+
+    document.addEventListener("visibilitychange", resynchronizeAfterPause);
+    window.addEventListener("focus", resynchronizeAfterPause);
+    window.addEventListener("online", resynchronizeAfterPause);
+    return () => {
+      document.removeEventListener("visibilitychange", resynchronizeAfterPause);
+      window.removeEventListener("focus", resynchronizeAfterPause);
+      window.removeEventListener("online", resynchronizeAfterPause);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!hasPollingTimeframes) return;
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        setPollVersion((version) => version + 1);
+      }
+    }, 10_000);
+    return () => window.clearInterval(timer);
+  }, [hasPollingTimeframes]);
 
   useEffect(() => {
     const timeframes = realtimeKey.split(",").filter(Boolean) as MultiTimeframeTimeframe[];
@@ -269,10 +310,11 @@ export function MultiTimeframeGrid({
           if (candle) {
             setRealtimeCandles((current) => ({
               ...current,
-              [`${layout.symbol}:${timeframe}`]: candle,
+              [`${layout.symbol}:${timeframe}`]: mergeRealtimeCandle(
+                current[`${layout.symbol}:${timeframe}`] ?? [],
+                candle,
+              ),
             }));
-            setSharedQuote({ symbol: layout.symbol, price: candle.close });
-            latestPriceChangeRef.current(candle.close);
             updateStatus(timeframe, "connected");
           }
         } catch {
@@ -292,7 +334,7 @@ export function MultiTimeframeGrid({
       reconnectTimers.forEach((timer) => window.clearTimeout(timer));
       sockets.forEach((socket) => socket.close(1000, "Workspace subscription changed"));
     };
-  }, [layout.symbol, realtimeKey]);
+  }, [layout.symbol, realtimeKey, resumeVersion]);
 
   return (
     <section
@@ -306,10 +348,16 @@ export function MultiTimeframeGrid({
           timezone={timezone}
           reviewWindow={reviewWindow}
           refreshVersion={refreshVersion}
-          realtimeCandle={realtimeCandles[`${layout.symbol}:${reviewWindow.timeframe}`]}
-          realtimeStatus={realtimeStatuses[`${layout.symbol}:${reviewWindow.timeframe}`] ?? "connecting"}
-          sharedLatestPrice={sharedLatestPrice}
+          resumeVersion={resumeVersion + pollVersion}
+          realtimeCandles={realtimeCandles[`${layout.symbol}:${reviewWindow.timeframe}`]}
+          realtimeStatus={
+            supportsRealtimeTimeframe(layout.symbol, reviewWindow.timeframe)
+              ? realtimeStatuses[`${layout.symbol}:${reviewWindow.timeframe}`] ?? "connecting"
+              : "polling"
+          }
           chartHeight={layout.windowCount === 1 ? 460 : 260}
+          active={reviewWindow.id === activeWindowId}
+          onActivate={() => onActiveWindowChange(reviewWindow.id)}
           onTimeframeChange={onTimeframeChange}
           onReviewChange={onReviewChange}
         />

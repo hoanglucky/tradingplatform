@@ -6,7 +6,8 @@ import {
   getReconnectDelay,
   mergeRealtimeCandle,
   normalizeRealtimeCandle,
-  synchronizeLatestCandlePrice,
+  reconcileContiguousOpen,
+  shouldResumeMarketData,
 } from "../lib/market-stream.ts";
 
 const historicalCandle = {
@@ -61,7 +62,23 @@ test("appends a newer candle", () => {
   const candles = mergeRealtimeCandle([historicalCandle], newerCandle);
 
   assert.equal(candles.length, 2);
-  assert.strictEqual(candles[1], newerCandle);
+  assert.equal(candles[1].open, historicalCandle.close);
+  assert.equal(candles[1].timestamp, newerCandle.timestamp);
+});
+
+test("retains consecutive realtime candles in a bounded stream buffer", () => {
+  const second = {...historicalCandle, timestamp: "2026-06-29T08:01:00Z"};
+  const third = {...historicalCandle, timestamp: "2026-06-29T08:02:00Z"};
+  const buffered = [historicalCandle, second, third].reduce(
+    (candles, candle) => mergeRealtimeCandle(candles, candle),
+    [],
+  );
+
+  assert.deepEqual(buffered.map((candle) => candle.timestamp), [
+    historicalCandle.timestamp,
+    second.timestamp,
+    third.timestamp,
+  ]);
 });
 
 test("ignores an older unknown candle", () => {
@@ -101,13 +118,44 @@ test("adds the first realtime candle to an empty chart", () => {
   assert.deepEqual(merged, [historicalCandle]);
 });
 
-test("synchronizes every active chart candle to one workspace price", () => {
-  const synchronized = synchronizeLatestCandlePrice([historicalCandle], 103);
+test("uses the previous close as open for contiguous realtime candles", () => {
+  const next = {
+    ...historicalCandle,
+    timestamp: "2026-06-29T08:01:00Z",
+    open: 102,
+    high: 104,
+    low: 102,
+  };
+  const reconciled = reconcileContiguousOpen(historicalCandle, next);
 
-  assert.equal(synchronized[0].close, 103);
-  assert.equal(synchronized[0].high, 103);
-  assert.equal(synchronized[0].low, 99);
-  assert.equal(historicalCandle.close, 101);
+  assert.equal(reconciled.open, historicalCandle.close);
+  assert.equal(reconciled.low, historicalCandle.close);
+  assert.equal(reconciled.high, 104);
+});
+
+test("preserves provider open across a real market gap", () => {
+  const next = {
+    ...historicalCandle,
+    timestamp: "2026-06-29T08:03:00Z",
+    open: 104,
+    high: 105,
+    low: 103,
+  };
+
+  assert.strictEqual(reconcileContiguousOpen(historicalCandle, next), next);
+});
+
+test("reconciles contiguous opens across standard timeframes", () => {
+  for (const [timeframe, previousTimestamp, nextTimestamp] of [
+    ["1m", "2026-06-29T08:00:00Z", "2026-06-29T08:01:00Z"],
+    ["5m", "2026-06-29T08:00:00Z", "2026-06-29T08:05:00Z"],
+    ["1h", "2026-06-29T08:00:00Z", "2026-06-29T09:00:00Z"],
+    ["1d", "2026-06-29T00:00:00Z", "2026-06-30T00:00:00Z"],
+  ]) {
+    const previous = {...historicalCandle, timeframe, timestamp: previousTimestamp, close: 101};
+    const next = {...historicalCandle, timeframe, timestamp: nextTimestamp, open: 103, high: 104, low: 102};
+    assert.equal(reconcileContiguousOpen(previous, next).open, 101);
+  }
 });
 
 test("rejects inconsistent realtime OHLC values", () => {
@@ -136,6 +184,12 @@ test("calculates bounded exponential reconnect delays", () => {
   assert.equal(getReconnectDelay(0, 1000, 15000), 1000);
   assert.equal(getReconnectDelay(3, 1000, 15000), 8000);
   assert.equal(getReconnectDelay(8, 1000, 15000), 15000);
+});
+
+test("resynchronizes once when a paused chart becomes visible", () => {
+  assert.equal(shouldResumeMarketData("hidden", 1_000, 5_000), false);
+  assert.equal(shouldResumeMarketData("visible", 1_000, 1_999), false);
+  assert.equal(shouldResumeMarketData("visible", 1_000, 2_000), true);
 });
 
 test("creates pong responses only for valid heartbeat messages", () => {

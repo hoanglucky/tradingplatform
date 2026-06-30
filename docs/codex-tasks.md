@@ -14,6 +14,72 @@ Use this file to track task-level handoff notes for Codex sessions.
 
 ## Completed
 
+### 2026-06-30 - Day 30.9.6 realtime candle open continuity repair
+
+Implemented:
+
+- Removed cross-timeframe price mutation from live OHLC.
+- Retained consecutive realtime candles per symbol/timeframe.
+- Reconciled contiguous candle opens with previous closes without masking real market gaps.
+
+Verified:
+
+- 55 frontend tests, lint, typecheck, and production build pass.
+
+### 2026-06-30 - Days 30.14–30.18 custom timeframe favorites
+
+Implemented:
+
+- Provider-direct and cached aggregate candle paths for safe custom timeframes.
+- Week and calendar-month timeframe parsing and aggregation.
+- Custom timeframe API validation and chart-layout persistence.
+- Grouped timeframe menu, custom entry, and persistent star favorites.
+- REST auto-sync for aggregate-only charts.
+
+Verified:
+
+- 93 market-data, 57 API, and 52 frontend tests pass.
+- Frontend lint, typecheck, and production build pass.
+
+### 2026-06-30 - Day 30.9.5 automatic chart recovery after browser pause
+
+Implemented:
+
+- Added debounced recovery for visible-tab, window-focus, and browser-online events.
+- Automatically refetches historical candles and recreates realtime subscriptions.
+- Keeps existing candles rendered while backfill is in progress.
+- Applies recovery to every visible timeframe without manual refresh.
+
+Safety:
+
+- Recovery only reads market data; no order or exchange-write behavior changed.
+
+### 2026-06-30 - Day 30.9.4 collapsible chart navigation sidebars
+
+Implemented:
+
+- Converted primary navigation to a collapsible icon rail with active-route state.
+- Converted the chart market watchlist to an independently collapsible right rail.
+- Persisted both layout preferences through a hydration-safe browser store hook.
+- Allowed the chart grid to consume the released horizontal space.
+
+Verified:
+
+- Frontend lint, 46 tests, typecheck, diff check, and production build pass.
+
+### 2026-06-30 - Day 30.9.3 chart workspace control layout polish
+
+Implemented:
+
+- Reordered the top controls as symbol, active timeframe, windows, and actions.
+- Added active chart targeting for the shared timeframe buttons.
+- Removed redundant realtime price text and moved timezone to the footer.
+- Reduced time-axis labels to hour and minute while retaining detailed crosshair ranges.
+
+Verified:
+
+- Frontend lint, 46 tests, typecheck, and production build pass.
+
 ### 2026-06-30 - Day 30.12 closed versus partial candle handling
 
 Implemented:

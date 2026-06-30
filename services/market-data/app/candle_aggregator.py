@@ -53,18 +53,41 @@ class CandleAggregator:
         buckets: dict[int, list[Candle]] = {}
         for candle in ordered:
             timestamp_milliseconds = int(candle.timestamp.timestamp() * 1000)
-            bucket_milliseconds = (
-                timestamp_milliseconds // target.duration_milliseconds
-            ) * target.duration_milliseconds
+            if target.unit == "M":
+                utc_timestamp = candle.timestamp.astimezone(UTC)
+                bucket_milliseconds = int(
+                    datetime(utc_timestamp.year, utc_timestamp.month, 1, tzinfo=UTC).timestamp()
+                    * 1000
+                )
+            elif target.unit == "w":
+                monday_anchor_milliseconds = int(
+                    datetime(1970, 1, 5, tzinfo=UTC).timestamp() * 1000
+                )
+                bucket_milliseconds = (
+                    (timestamp_milliseconds - monday_anchor_milliseconds)
+                    // target.duration_milliseconds
+                ) * target.duration_milliseconds + monday_anchor_milliseconds
+            else:
+                bucket_milliseconds = (
+                    timestamp_milliseconds // target.duration_milliseconds
+                ) * target.duration_milliseconds
             buckets.setdefault(bucket_milliseconds, []).append(candle)
 
         aggregated: list[AggregatedCandle] = []
         for bucket_milliseconds, bucket in sorted(buckets.items()):
             bucket_start = datetime.fromtimestamp(bucket_milliseconds / 1000, tz=UTC)
-            bucket_end = datetime.fromtimestamp(
-                (bucket_milliseconds + target.duration_milliseconds) / 1000,
-                tz=UTC,
-            )
+            if target.unit == "M":
+                bucket_end = datetime(
+                    bucket_start.year + (1 if bucket_start.month == 12 else 0),
+                    1 if bucket_start.month == 12 else bucket_start.month + 1,
+                    1,
+                    tzinfo=UTC,
+                )
+            else:
+                bucket_end = datetime.fromtimestamp(
+                    (bucket_milliseconds + target.duration_milliseconds) / 1000,
+                    tz=UTC,
+                )
             closed = bucket_end <= evaluation_time
             if not include_partial and not closed:
                 continue

@@ -1497,7 +1497,10 @@ Implementation note — 2026-06-30:
 - Updated the local MVP user's chart timezone to `Asia/Bangkok` for TradingView UTC+7 comparison.
 - Historical and realtime payload timestamps remain untouched UTC provider-open instants.
 - A correction removed the earlier duration offset that made a 14:55 5m candle appear as 15:00 when selected.
-- Verification: 45 frontend tests, lint, typecheck, and production build pass.
+- Lightweight Charts may render sparse axis labels such as 15:00 then 15:05 to prevent overlap; this does not remove intermediate 1m candles.
+- Added an on-chart crosshair timestamp label so hovering intermediate bars shows 15:01, 15:02, 15:03, and 15:04 explicitly.
+- Crosshair labels now show each timeframe's complete opening-to-closing range, such as `5m 15:00 - 15:05` and `15m 15:00 - 15:15`.
+- Verification: 46 frontend tests, lint, typecheck, and production build pass.
 Day 30.9.2 — Oanda trailing candle cache repair
 Goal: Prevent stale higher-timeframe cache ranges from creating missing chart periods.
 
@@ -1528,6 +1531,129 @@ Implementation note — 2026-06-30:
 - Rebuilt market-data and refetched XAUUSD ranges; 5m, 15m, 30m, 1h, 2h, and 4h tails now reach their latest completed provider bucket.
 - Remaining 75/90-minute and weekend gaps match Oanda market closures rather than missing cache rows.
 - Verification: 64 market-data tests, live range diagnostics, service health, Ruff, and diff checks pass.
+Day 30.9.3 — Chart workspace control layout polish
+Goal: Make symbol, timeframe, window-count, and timezone controls easier to scan.
+
+Codex task:
+
+Reorder the chart controls and simplify redundant market information.
+
+Requirements:
+- Use one top toolbar ordered as symbol, active-window timeframe, layout count, and actions.
+- Clicking or focusing a chart makes it the active window for the top timeframe selector.
+- Keep per-window timeframe selectors for direct local editing.
+- Remove the global realtime price summary and numeric live price from window headers.
+- Move chart timezone to the bottom-right footer.
+- Show only hour and minute on time-axis ticks.
+- Keep full candle range information in the crosshair overlay.
+- Remain responsive for mobile and 1/2/4/8 layouts.
+
+Done checklist:
+
+[x] Top controls follow Symbol → Timeframe → Windows order
+[x] Active window timeframe control works
+[x] Realtime price summary removed
+[x] Timezone is bottom-right
+[x] Time axis uses HH:mm only
+[x] Responsive build passes
+
+Implementation note — 2026-06-30:
+
+- Consolidated two control rows into one responsive toolbar.
+- Added active-window state and a restrained active border so top timeframe buttons target the selected chart.
+- Removed global and per-window numeric realtime price text while retaining realtime candle synchronization and compact stream status.
+- Moved the persisted timezone selector beside attribution in the chart footer.
+- Time-axis formatter now returns only `HH:mm`; the crosshair overlay still shows complete timeframe ranges.
+- Verification: 46 frontend tests, lint, typecheck, and production build pass.
+Day 30.9.4 — Collapsible chart navigation sidebars
+Goal: Maximize chart space while keeping application and market navigation available.
+
+Codex task:
+
+Convert the left application navigation and right market watchlist into independently collapsible sidebars.
+
+Requirements:
+- Collapse the primary navigation toward the left edge and retain icon navigation.
+- Mark the current primary route and expose labels through tooltips while collapsed.
+- Collapse the market watchlist toward the right edge and retain a visible reopen control.
+- Expand the chart column into space released by either sidebar.
+- Persist both collapse preferences in browser storage.
+- Keep keyboard focus states and responsive behavior.
+
+Done checklist:
+
+[x] Left navigation collapses to an icon rail
+[x] Right market list collapses to a compact rail
+[x] Chart expands with both independent states
+[x] Collapse preferences persist
+[x] Responsive production build passes
+
+Implementation note — 2026-06-30:
+
+- Added route-aware Lucide icons and active-state styling to the primary navigation.
+- Added independent edge controls for the left navigation and right market watchlist.
+- Added a shared `useSyncExternalStore` preference hook for hydration-safe local storage and cross-tab updates.
+- Changed the chart page grid between a 320px market list and a 44px collapsed rail.
+- Verification: frontend lint, 46 tests, typecheck, diff check, and production build pass.
+Day 30.9.5 — Automatic chart recovery after browser pause
+Goal: Restore every missed candle after a minimized, hidden, suspended, or offline browser session.
+
+Codex task:
+
+Resynchronize historical and realtime data automatically when the chart becomes active again.
+
+Requirements:
+- Detect visible-tab, window-focus, and browser-online recovery events.
+- Fetch a fresh historical range for every visible chart window.
+- Recreate WebSocket subscriptions after recovery.
+- Debounce duplicate focus and visibility events.
+- Keep existing candles visible while the recovery request is running.
+- Require no manual Refresh action.
+
+Done checklist:
+
+[x] Hidden-tab recovery triggers REST backfill
+[x] Realtime subscriptions reconnect automatically
+[x] Duplicate resume events are debounced
+[x] Existing chart remains visible during backfill
+[x] Recovery behavior applies to every visible timeframe
+
+Implementation note — 2026-06-30:
+
+- Added one shared resume generation to the multi-timeframe workspace.
+- `visibilitychange`, `focus`, and `online` now trigger a debounced resynchronization when the document is visible.
+- Every active timeframe reloads its recent authoritative candle range and recreates its WebSocket subscription.
+- Historical state is cleared only when symbol or timeframe identity changes, avoiding blank charts during recovery.
+- Browser background execution remains best-effort; correctness comes from deterministic REST backfill on resume.
+Day 30.9.6 — Realtime candle open continuity repair
+Goal: Prevent temporary false gaps while live candles roll into the next bucket.
+
+Codex task:
+
+Keep realtime OHLC isolated per timeframe and reconcile contiguous candle transitions.
+
+Requirements:
+- Do not apply one timeframe's latest price to another timeframe's OHLC.
+- Retain consecutive realtime candles until REST history catches up.
+- For exactly contiguous buckets, use the previous close as the next open.
+- Expand high/low only when needed to keep corrected OHLC valid.
+- Preserve provider opens across real session, maintenance, and weekend gaps.
+- Apply the rule to minute, hour, day, week, and month durations.
+
+Done checklist:
+
+[x] Cross-timeframe OHLC mutation removed
+[x] Realtime candles retained in a bounded per-timeframe buffer
+[x] Contiguous open equals previous close
+[x] Real market gaps remain unchanged
+[x] Regression tests pass
+
+Implementation note — 2026-06-30:
+
+- Removed `sharedLatestPrice`, which could temporarily move the previous candle close/high/low using an update from another timeframe.
+- Realtime state now stores a bounded candle sequence per symbol/timeframe instead of only the latest snapshot.
+- Merge reconciliation adjusts open only when timestamps differ by exactly one timeframe duration.
+- Verification: 55 frontend tests, lint, typecheck, and production build pass.
 Day 30.10 — Timeframe parser and validation
 Goal: Support custom timeframe strings safely.
 
@@ -1699,10 +1825,20 @@ Rules:
 - Add tests for direct provider and aggregate fallback.
 Done checklist:
 
-[ ] Direct timeframe path works
-[ ] Aggregate fallback works
-[ ] Cache upsert works
+[x] Direct timeframe path works
+[x] Aggregate fallback works
+[x] Cache upsert works
 [ ] Source metadata preserved
+
+Implementation note — 2026-06-30:
+
+- Candle storage now validates and normalizes target timeframes before cache lookup.
+- Direct provider intervals retain the existing provider/storage path.
+- Unsupported intervals select the largest compatible direct base, aggregate OHLCV, and upsert target candles.
+- Added fixed week buckets and calendar-month buckets (`1M`).
+- Source metadata remains a follow-up because the current candle schema has no source fields.
+- Week aggregation is aligned to Monday UTC; month aggregation uses calendar boundaries.
+- Verification: 93 market-data tests pass, including Oanda `1m -> 3m` fallback.
 Day 30.15 — API support for custom timeframe
 Goal: /market/candles accepts custom timeframe values.
 
@@ -1727,10 +1863,16 @@ Requirements:
 - Add tests.
 Done checklist:
 
-[ ] Custom timeframe accepted
-[ ] Invalid timeframe rejected cleanly
+[x] Custom timeframe accepted
+[x] Invalid timeframe rejected cleanly
 [ ] Response metadata exists
-[ ] Tests pass
+[x] Tests pass
+
+Implementation note — 2026-06-30:
+
+- `/market/candles` accepts normalized minute, hour, day, week, and `1M` values.
+- Invalid, zero, malformed, or over-one-month values return HTTP 400.
+- Response shape remains the existing candle list for frontend compatibility; metadata is still pending.
 Day 30.16 — Frontend custom timeframe option
 Goal: User can add custom timeframe to a chart window.
 
@@ -1750,9 +1892,16 @@ Requirements:
 - Do not allow invalid values to be saved.
 Done checklist:
 
-[ ] Custom timeframe input exists
-[ ] Client validation works
-[ ] Invalid value not saved
+[x] Custom timeframe input exists
+[x] Client validation works
+[x] Invalid value not saved
+
+Implementation note — 2026-06-30:
+
+- Added a dropdown grouped into Minutes, Hours, Long range, and Custom input.
+- Presets include 1/3/5/15/30/45m, 1/2/3/4h, 1d, 2w, and calendar month `1M`.
+- Invalid custom values cannot be applied or favorited.
+- Star controls determine which timeframe buttons appear in the main toolbar.
 Day 30.17 — Persist custom timeframe layout
 Goal: Custom timeframe windows survive reload.
 
@@ -1767,9 +1916,15 @@ Requirements:
 - Keep reviewChecked state intact.
 Done checklist:
 
-[ ] Custom timeframe saves
-[ ] Custom timeframe reloads
-[ ] Invalid saved value falls back safely
+[x] Custom timeframe saves
+[x] Custom timeframe reloads
+[x] Invalid saved value falls back safely
+
+Implementation note — 2026-06-30:
+
+- API settings validation now accepts safe custom timeframe strings inside each chart window.
+- Frontend layout resolution normalizes valid persisted values and rejects invalid layouts.
+- Timeframe favorites persist independently in browser-local presentation settings.
 Day 30.18 — Connect custom timeframe windows to candles API
 Goal: Multi-window chart can display custom aggregated candles.
 
@@ -1785,9 +1940,15 @@ Requirements:
 - One failed custom timeframe must not crash other windows.
 Done checklist:
 
-[ ] Custom timeframe chart loads
+[x] Custom timeframe chart loads
 [ ] Aggregation label visible when used
-[ ] Per-window errors work
+[x] Per-window errors work
+
+Implementation note — 2026-06-30:
+
+- Custom windows send their normalized timeframe to `/market/candles`.
+- Provider-native intervals retain WebSocket updates; aggregate-only intervals use visible-tab REST auto-sync every 10 seconds.
+- Each window keeps independent loading/error state.
 Day 30.19 — Aggregation cache verification
 Goal: Prevent repeated expensive aggregation.
 

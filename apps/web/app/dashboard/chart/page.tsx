@@ -1,6 +1,5 @@
 import { AppShell } from "../../../components/AppShell";
-import { ChartWorkspace } from "../../../components/ChartWorkspace";
-import { WatchlistPanel } from "../../../components/WatchlistPanel";
+import { ChartPageLayout } from "../../../components/ChartPageLayout";
 import { getDashboardData } from "../../../lib/api";
 
 export default async function ChartPage({
@@ -14,14 +13,7 @@ export default async function ChartPage({
 
   return (
     <AppShell health={health} readiness={readiness} safety={safety}>
-      <main className="chart-page">
-        <div className="chart-main-column">
-          <ChartWorkspace key={initialSymbol ?? "settings-default"} initialSymbol={initialSymbol} />
-        </div>
-        <aside className="chart-watchlist-column" aria-label="Chart watchlist">
-          <WatchlistPanel />
-        </aside>
-      </main>
+      <ChartPageLayout initialSymbol={initialSymbol} />
     </AppShell>
   );
 }

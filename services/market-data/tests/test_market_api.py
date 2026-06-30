@@ -80,6 +80,43 @@ def test_market_candles_requires_all_query_params() -> None:
     assert response.status_code == 422
 
 
+def test_market_candles_accepts_and_normalizes_custom_timeframe() -> None:
+    app.dependency_overrides[get_candle_storage_service] = lambda: StubStorageService()
+    try:
+        response = client.get(
+            "/market/candles",
+            params={
+                "symbol": "XAUUSD",
+                "timeframe": "45M",
+                "start": datetime(2024, 6, 19, 8, 0, tzinfo=UTC).isoformat(),
+                "end": datetime(2024, 6, 19, 9, 0, tzinfo=UTC).isoformat(),
+            },
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json()[0]["timeframe"] == "45m"
+
+
+def test_market_candles_rejects_invalid_custom_timeframe() -> None:
+    app.dependency_overrides[get_candle_storage_service] = lambda: StubStorageService()
+    try:
+        response = client.get(
+            "/market/candles",
+            params={
+                "symbol": "XAUUSD",
+                "timeframe": "0m",
+                "start": datetime(2024, 6, 19, 8, 0, tzinfo=UTC).isoformat(),
+                "end": datetime(2024, 6, 19, 9, 0, tzinfo=UTC).isoformat(),
+            },
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 400
+
+
 def test_market_candles_maps_validation_errors_to_bad_request() -> None:
     app.dependency_overrides[get_candle_storage_service] = lambda: ErrorStorageService(
         BinanceValidationError("unsupported Binance interval: 2m")

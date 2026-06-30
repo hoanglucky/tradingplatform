@@ -29,16 +29,16 @@
 
 ## Current review task
 
-Review the TradingView candle opening-time alignment correction.
+Review realtime candle open continuity.
 
 Focus areas:
 
-- Confirm Lightweight Charts coordinates use unshifted provider opening timestamps.
-- Confirm a Bangkok 5m candle opened at 14:55 is selected as 14:55, not 15:00.
-- Confirm 1m candles no longer gain an extra minute on the crosshair.
-- Confirm UTC and Asia/Bangkok formatting only changes display timezone.
-- Confirm derived close-time helpers do not alter historical or realtime candle payloads.
-- Confirm every layout window uses the same opening-time convention.
+- Observe at least two 1m transitions without reloading.
+- Confirm each new contiguous candle opens at the previous candle close.
+- Repeat on 5m and another visible higher timeframe.
+- Confirm previous candles do not change because another timeframe updates.
+- Confirm no realtime candle disappears before REST backfill.
+- Confirm a genuine market-session gap is not forcibly closed.
 - Confirm no live trading or exchange write behavior was added.
 
 ## Verification commands

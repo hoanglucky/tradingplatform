@@ -26,13 +26,18 @@ test("defines supported multi-timeframe window count presets", () => {
 test("defines extended review timeframe options", () => {
   assert.deepEqual(MULTI_TIMEFRAME_TIMEFRAMES, [
     "1m",
+    "3m",
     "5m",
     "15m",
     "30m",
+    "45m",
     "1h",
     "2h",
+    "3h",
     "4h",
     "1d",
+    "2w",
+    "1M",
   ]);
 });
 
