@@ -196,6 +196,31 @@ async def test_oanda_rejects_invalid_timeframe_before_request() -> None:
 
 
 @pytest.mark.anyio
+async def test_oanda_supports_two_hour_candles_directly() -> None:
+    seen_granularity = ""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal seen_granularity
+        seen_granularity = parse_qs(request.url.query.decode())["granularity"][0]
+        return httpx.Response(200, json={"candles": []})
+
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(handler),
+        base_url="https://api-fxpractice.oanda.com",
+    ) as client:
+        provider = OandaMarketDataProvider(api_token="token", client=client)
+        candles = await provider.get_historical_candles(
+            "XAUUSD",
+            "2h",
+            datetime(2024, 6, 19, 8, 0, tzinfo=UTC),
+            datetime(2024, 6, 19, 12, 0, tzinfo=UTC),
+        )
+
+    assert seen_granularity == "H2"
+    assert candles == []
+
+
+@pytest.mark.anyio
 async def test_oanda_wraps_api_errors() -> None:
     def handler(_request: httpx.Request) -> httpx.Response:
         return httpx.Response(401, json={"errorMessage": "Insufficient authorization"})

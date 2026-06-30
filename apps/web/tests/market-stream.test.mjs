@@ -6,6 +6,7 @@ import {
   getReconnectDelay,
   mergeRealtimeCandle,
   normalizeRealtimeCandle,
+  synchronizeLatestCandlePrice,
 } from "../lib/market-stream.ts";
 
 const historicalCandle = {
@@ -98,6 +99,15 @@ test("adds the first realtime candle to an empty chart", () => {
   const merged = mergeRealtimeCandle([], historicalCandle);
 
   assert.deepEqual(merged, [historicalCandle]);
+});
+
+test("synchronizes every active chart candle to one workspace price", () => {
+  const synchronized = synchronizeLatestCandlePrice([historicalCandle], 103);
+
+  assert.equal(synchronized[0].close, 103);
+  assert.equal(synchronized[0].high, 103);
+  assert.equal(synchronized[0].low, 99);
+  assert.equal(historicalCandle.close, 101);
 });
 
 test("rejects inconsistent realtime OHLC values", () => {

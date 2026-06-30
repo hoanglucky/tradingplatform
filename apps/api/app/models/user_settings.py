@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import ForeignKey, String, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
@@ -37,6 +37,9 @@ class UserSettings(UuidPrimaryKeyMixin, TimestampMixin, Base):
     )
     timezone: Mapped[str] = mapped_column(
         String(64), default="UTC", server_default="UTC", nullable=False
+    )
+    multi_timeframe_layout: Mapped[dict[str, Any] | None] = mapped_column(
+        JSONB, nullable=True
     )
 
     user: Mapped["User"] = relationship(back_populates="settings")

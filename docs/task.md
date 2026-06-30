@@ -29,17 +29,16 @@
 
 ## Current review task
 
-Review the Day 30.3 multi-timeframe grid UI.
+Review the TradingView candle opening-time alignment correction.
 
 Focus areas:
 
-- Confirm `MultiTimeframeGrid` renders only visible enabled windows.
-- Confirm 1/2/4/8 layouts use responsive 1/2/4-column rules.
-- Confirm every window displays the one shared symbol.
-- Confirm timeframe changes update only the targeted window ID.
-- Confirm Reviewed changes update only the targeted window ID.
-- Confirm placeholder regions do not fetch candles yet.
-- Confirm the old single live chart remains rendered below the grid.
+- Confirm Lightweight Charts coordinates use unshifted provider opening timestamps.
+- Confirm a Bangkok 5m candle opened at 14:55 is selected as 14:55, not 15:00.
+- Confirm 1m candles no longer gain an extra minute on the crosshair.
+- Confirm UTC and Asia/Bangkok formatting only changes display timezone.
+- Confirm derived close-time helpers do not alter historical or realtime candle payloads.
+- Confirm every layout window uses the same opening-time convention.
 - Confirm no live trading or exchange write behavior was added.
 
 ## Verification commands

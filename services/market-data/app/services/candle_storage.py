@@ -95,8 +95,8 @@ class CandleStorageService:
         duration = TIMEFRAME_DURATION.get(timeframe)
         if not candles or duration is None:
             return False
-        edge_tolerance = timedelta(days=3) if exchange == "oanda" else duration
+        leading_tolerance = timedelta(days=3) if exchange == "oanda" else duration
         return (
-            candles[0].timestamp <= start + edge_tolerance
-            and candles[-1].timestamp + edge_tolerance >= end
+            candles[0].timestamp <= start + leading_tolerance
+            and candles[-1].timestamp + duration >= end
         )

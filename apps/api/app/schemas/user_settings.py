@@ -6,11 +6,47 @@ from datetime import datetime
 from typing import Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 Timeframe = Literal["1m", "5m", "15m", "1h", "4h", "1d"]
 Theme = Literal["light", "dark", "system"]
 INDICATOR_PATTERN = re.compile(r"^[a-z][a-z0-9_-]{0,31}$")
+ReviewTimeframe = Literal["1m", "5m", "15m", "30m", "1h", "2h", "4h", "1d"]
+WindowCount = Literal[1, 2, 4, 8]
+
+
+class MultiTimeframeWindow(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    id: str = Field(min_length=1, max_length=32, pattern=r"^[A-Za-z0-9_-]+$")
+    timeframe: ReviewTimeframe
+    enabled: bool
+    reviewChecked: bool
+
+
+class MultiTimeframeLayout(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, populate_by_name=True)
+
+    symbol: str = Field(min_length=2, max_length=40, pattern=r"^[A-Z0-9_]+$")
+    window_count: WindowCount = Field(alias="windowCount")
+    windows: list[MultiTimeframeWindow] = Field(min_length=1, max_length=8)
+
+    @field_validator("symbol", mode="before")
+    @classmethod
+    def normalize_symbol(cls, value: object) -> object:
+        return value.strip().upper() if isinstance(value, str) else value
+
+    @model_validator(mode="after")
+    def validate_windows(self) -> "MultiTimeframeLayout":
+        ids = [window.id for window in self.windows]
+        if len(set(ids)) != len(ids):
+            raise ValueError("Multi-timeframe window ids must be unique.")
+        if len(self.windows) < self.window_count:
+            raise ValueError("Layout must contain at least windowCount windows.")
+        enabled_count = sum(window.enabled for window in self.windows)
+        if enabled_count != self.window_count:
+            raise ValueError("Enabled window count must match windowCount.")
+        return self
 
 
 class UserSettingsRead(BaseModel):
@@ -23,6 +59,7 @@ class UserSettingsRead(BaseModel):
     selected_indicators: list[str]
     theme: Theme
     timezone: str
+    multi_timeframe_layout: MultiTimeframeLayout | None
     created_at: datetime
     updated_at: datetime
 
@@ -37,6 +74,7 @@ class UserSettingsPatch(BaseModel):
     selected_indicators: list[str] | None = Field(default=None, max_length=20)
     theme: Theme | None = None
     timezone: str | None = Field(default=None, min_length=1, max_length=64)
+    multi_timeframe_layout: MultiTimeframeLayout | None = None
 
     @field_validator("default_symbol", mode="before")
     @classmethod

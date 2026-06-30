@@ -133,6 +133,15 @@ def test_normalize_oanda_current_candle() -> None:
     assert result.source == "oanda"
 
 
+@pytest.mark.parametrize("timeframe", ["30m", "2h"])
+def test_oanda_extended_realtime_timeframes(timeframe: str) -> None:
+    subscription = MarketSubscription(
+        type="subscribe", symbol="XAUUSD", timeframe=timeframe
+    )
+
+    assert subscription.timeframe == timeframe
+
+
 def test_normalize_oanda_candle_rejects_invalid_data() -> None:
     active_subscription = MarketSubscription(
         type="subscribe", symbol="SP500", timeframe="5m"

@@ -36,7 +36,7 @@ async def patch_settings(
     user: User = Depends(get_mvp_user),
     db: AsyncSession = Depends(get_db),
 ) -> UserSettings:
-    changes = payload.model_dump(exclude_unset=True, exclude_none=True)
+    changes = payload.model_dump(exclude_unset=True, exclude_none=True, by_alias=True)
     default_symbol = changes.get("default_symbol")
     if default_symbol is not None:
         symbol = await SymbolRepository(db).get_active_by_symbol(default_symbol)
@@ -44,6 +44,15 @@ async def patch_settings(
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Active default symbol not found.",
+            )
+
+    layout = changes.get("multi_timeframe_layout")
+    if layout is not None:
+        layout_symbol = await SymbolRepository(db).get_active_by_symbol(layout["symbol"])
+        if layout_symbol is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Active multi-timeframe symbol not found.",
             )
 
     user_settings, _ = await ensure_user_settings(db, user)

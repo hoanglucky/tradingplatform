@@ -1339,3 +1339,263 @@ Implement Day 28.
 
 - Reviewed state remains local UI workflow state only.
 - No candle aggregation, strategy signal, paper order, or exchange write was added.
+
+## 2026-06-30 - Day 30.4 extended timeframe presets and plan review
+
+### Work completed
+
+- Reviewed the expanded roadmap from Day 30.x through custom aggregation, structure/setup engines, cross-market data, orderflow/liquidity, premium providers, and quant modules.
+- Added review-only 30m and 2h options while leaving the single-chart selector unchanged.
+- Added final defaults for 1/2/4/8 layouts, including eight distinct timeframes for layout 8.
+- Added direct OANDA H2 support for two-hour historical candles.
+- Reconciled completed Day 30.1–30.4 checklists in the newly updated plan.
+
+### Verification performed
+
+- `npm run web-test` passed lint, 27 tests, typecheck, and production build.
+- `npm run market-data-test` passed all 32 tests.
+- Live `XAUUSD` 2h smoke testing returned direct OANDA candles with timeframe `2h`.
+
+### Plan review
+
+- Complete Day 30.5–30.7 before custom timeframe and aggregation work.
+- Implement Day 30.10–30.22 as one dependency chain: parser, aggregator, partial handling, capability routing, API, persistence, cache, tests, and docs.
+- Treat Day 30.30+, 30.50+, 30.80+, and 30.90+ as later module groups rather than parallel work.
+- The new Day 30.x entries are plain-text headings; converting them to Markdown headings later would improve navigation without changing scope.
+
+### Safety notes
+
+- No candle aggregation, strategy signal, paper order, live trading, or exchange write was added.
+
+## 2026-06-30 - Day 30.5 review checkbox workflow
+
+### Work completed
+
+- Added a live Reviewed progress indicator for visible/enabled windows.
+- Added Clear review with disabled zero-progress state.
+- Cleared review flags across visible and hidden windows to prevent stale state after expansion.
+- Kept review actions local to the chart workspace.
+
+### Verification performed
+
+- Progress and clear-all state tests passed.
+- `npm run web-test` passed lint, 29 tests, typecheck, and production build.
+
+### Safety notes
+
+- Review flags do not create signals, invoke strategy evaluation, create paper orders, or access exchange writes.
+
+## 2026-06-30 - Day 30.6 persist multi-timeframe layout
+
+### Work completed
+
+- Added nullable JSONB layout storage and migration `20260630_0005`.
+- Added nested backend schemas and active-symbol validation.
+- Added shared TypeScript contracts and frontend runtime validation.
+- Loaded valid saved layouts, repaired invalid layouts with a safe default, and queued layout writes with existing preferences.
+- Preserved default symbol, timeframe, indicators, theme, and timezone behavior.
+
+### Verification performed
+
+- `npm run api-test` passed all 52 backend tests.
+- `npm run lint:api` passed Ruff.
+- `npm run web-test` passed lint, 33 tests, typecheck, and production build.
+- Migration head is `20260630_0005`.
+- Live API save/reload returned the persisted XAUUSD four-window layout.
+
+### Safety notes
+
+- Layout persistence only modifies local user preferences and cannot create signals or orders.
+
+## 2026-06-30 - Day 30.7 connect multi-window candles
+
+### Work completed
+
+- Extracted shared candle request, error, and normalization logic from `ChartWorkspace`.
+- Reused that client for the existing chart and every enabled multi-timeframe window.
+- Added per-window loading, error, candle, and AbortController state.
+- Replaced placeholders with the existing `CandlestickChart` component.
+- Loaded the latest 120 candles independently for each direct provider timeframe.
+
+### Verification performed
+
+- Shared client tests cover range alignment, normalization, query construction, and provider errors.
+- `npm run web-test` passed lint, 36 tests, typecheck, and production build.
+- Direct API smoke testing covered all persisted layout timeframes.
+
+### Safety notes
+
+- No candle aggregation, strategy signal, paper order, multi-window realtime stream, or exchange write was added.
+
+## 2026-06-30 - Day 30.10 timeframe parser and validation
+
+### Work completed
+
+- Added a pure parser for positive integer minute, hour, and day timeframe strings.
+- Added canonical lowercase normalization and duration milliseconds.
+- Added explicit validation errors and a 31-day upper safety bound.
+- Kept the parser disconnected from providers, storage, and the candle API.
+
+### Verification performed
+
+- Added 20 parser cases including 6m, 7m, 45m, 3h, invalid syntax, and unsafe durations.
+- `npm run market-data-test` passed all 52 tests.
+- Ruff passed for the parser and its tests.
+
+### Safety notes
+
+- No candle aggregation, route behavior change, trading signal, paper order, or exchange write was added.
+
+## 2026-06-30 - Day 30.11 CandleAggregator base utility
+
+### Work completed
+
+- Added a pure `CandleAggregator` and functional `aggregate_candles` entry point.
+- Added deterministic fixed UTC bucket grouping for custom target durations.
+- Implemented first-open, maximum-high, minimum-low, last-close, summed-volume, and bucket-start output rules.
+- Added source consistency, target size, and exact duration multiple validation.
+
+### Verification performed
+
+- Added 11 tests covering 1m to 5m, 6m, 7m, and 15m, exact OHLCV output, timeframe normalization, timezone normalization, reversed input, empty input, and invalid combinations.
+- `npm run market-data-test` passed all 63 tests.
+- Ruff passed for the aggregator and its tests.
+
+### Follow-up boundary
+
+- Closed versus partial candle classification remains Day 30.12 work.
+- Provider fallback, API, database, and cache integration remain disconnected.
+
+### Safety notes
+
+- No strategy signal, paper order, live trading, account mutation, or exchange write was added.
+
+## 2026-06-30 - Day 30.8 multi-window realtime synchronization
+
+### Work completed
+
+- Removed the standalone chart that was rendered below the multi-timeframe workspace.
+- Made layout selection render exactly 1, 2, 4, or 8 charts; single mode uses a taller chart.
+- Moved realtime ownership to the workspace and deduplicated subscriptions by visible timeframe.
+- Merged each direct-provider realtime candle into its matching history and synchronized all active candle prices to the latest workspace quote.
+- Added WebSocket and Oanda realtime mappings for 30m/M30 and 2h/H2.
+- Kept per-window loading/error state, heartbeat pong, reconnect backoff, settings persistence, and refresh-all behavior.
+
+### Verification performed
+
+- `npm run web-test` passed lint, 38 tests, typecheck, and production build.
+- `npm run api-test` passed all 56 tests.
+- Ruff and `git diff --check` passed.
+- Live XAUUSD WebSocket smoke testing returned 4h, 1h, 5m, and 1m candles.
+- Rebuilt API/web containers are healthy at ports 8000 and 2000.
+
+### Safety notes
+
+- All market connections remain read-only; no strategy, order, account mutation, or exchange write path was added.
+
+## 2026-06-30 - Day 30.9 right-click chart view reset
+
+### Work completed
+
+- Added `resetCandlestickChartView` for deterministic time and price scale reset.
+- Added right-click handling to every loaded `CandlestickChart` canvas.
+- Suppressed the browser context menu on the canvas and reset only the selected chart instance.
+- Kept candle state, historical requests, realtime streams, and settings untouched.
+
+### Verification performed
+
+- Added tests for time-axis fitting, right-price-axis auto-scale, and unavailable chart instances.
+- `npm run web-test` passed lint, 40 tests, typecheck, and production build.
+
+### Safety notes
+
+- This is a presentation-only interaction and adds no trading or exchange-write behavior.
+
+## 2026-06-30 - Day 30.9.1 candle timestamp and timezone alignment
+
+### Work completed
+
+- Confirmed Oanda timestamps are UTC candle-open instants and left transport/storage unchanged.
+- Added open/close-time utilities for every multi-timeframe preset.
+- Kept chart points on provider opening instants and added timezone-aware axis/crosshair formatters.
+- Added a persisted UTC/Bangkok chart timezone control shared by all windows.
+- Set the local MVP user's persisted chart timezone to `Asia/Bangkok`.
+
+### Verification performed
+
+- Corrected an earlier duration offset that displayed a 14:55 candle as 15:00 when selected.
+- Tests cover unchanged provider-open coordinates, derived close calculations, UTC/Bangkok formatting, and invalid timestamps/timeframes.
+- `npm run web-test` passed lint, 45 tests, typecheck, and production build.
+
+### Safety notes
+
+- No provider payload, database timestamp, strategy, order, account, or exchange-write behavior changed.
+
+## 2026-06-30 - Day 30.9.2 Oanda trailing candle cache repair
+
+### Work completed
+
+- Reproduced stale 5m/15m and hourly API ranges while 1m data remained current.
+- Identified a three-day Oanda tolerance incorrectly applied to the cache trailing edge.
+- Kept weekend tolerance at the leading edge and restored strict duration-based trailing coverage.
+- Rebuilt market-data and refetched all XAUUSD preset timeframe ranges into PostgreSQL.
+
+### Verification performed
+
+- Added a regression test proving stale Oanda tails call the provider and return a complete range.
+- `npm run market-data-test` passed all 64 tests.
+- Live diagnostics show latest completed provider candles for every preset through 4h.
+- Remaining larger gaps match Oanda daily maintenance or weekend closure periods.
+
+### Safety notes
+
+- The change only refreshes read-only candle cache data and adds no exchange-write behavior.
+
+## 2026-06-30 - Day 30.12 closed versus partial candle handling
+
+### Work completed
+
+- Added an `AggregatedCandle` schema with complementary closed/partial state.
+- Classified buckets from their UTC end against a timezone-aware evaluation instant.
+- Kept partial candles enabled by default for chart consumers.
+- Added deterministic partial exclusion for backtest and replay consumers.
+- Rejected naive `as_of` values to avoid timezone-dependent results.
+
+### Verification performed
+
+- Added tests for active partial buckets, completed buckets, exact close boundaries, backtest exclusion, and invalid evaluation time.
+- `npm run market-data-test` passed all 68 tests.
+- Ruff passed for the updated schema, aggregator, and tests.
+
+### Follow-up boundary
+
+- Provider capability selection starts in Day 30.13.
+- Aggregate fallback and API integration remain Day 30.14–30.15.
+
+### Safety notes
+
+- No provider write, strategy signal, paper order, live trading, account mutation, or exchange write was added.
+
+## 2026-06-30 - Day 30.13 provider capability map
+
+### Work completed
+
+- Added an immutable capability registry sourced from Oanda and Binance adapter timeframe constants.
+- Added provider, venue, market type, data type, intended use, direct timeframe, and read-only metadata.
+- Classified Oanda as the primary CFD/FX source and Binance public as crypto development data.
+- Added normalized direct lookup and explicit aggregate-required detection for valid custom intervals.
+
+### Verification performed
+
+- Added 18 tests covering metadata, adapter-constant parity, direct intervals, custom intervals, malformed values, unknown providers, and registry immutability.
+- `npm run market-data-test` passed all 86 tests.
+- Ruff passed for the capability module and tests.
+
+### Follow-up boundary
+
+- Day 30.14 consumes the registry for direct-versus-aggregate candle routing.
+- `/market/candles` custom timeframe exposure remains Day 30.15.
+
+### Safety notes
+
+- Every provider remains explicitly read-only; no account or order behavior was added.

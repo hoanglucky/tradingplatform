@@ -1,20 +1,16 @@
 "use client";
 
-import type { Candle } from "@trading-framework/shared";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, RotateCcw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import {
-  createHeartbeatPong,
-  getReconnectDelay,
-  mergeRealtimeCandle,
-  normalizeRealtimeCandle,
-} from "../lib/market-stream";
-import { CandlestickChart } from "./CandlestickChart";
-import { HISTORY_RANGES, historyStartSeconds, type HistoryRange } from "../lib/chart-history";
-import {
+  MULTI_TIMEFRAME_TIMEFRAMES,
   MULTI_TIMEFRAME_WINDOW_COUNTS,
+  clearMultiTimeframeReview,
   createDefaultMultiTimeframeLayout,
+  getMultiTimeframeReviewProgress,
   resizeMultiTimeframeLayout,
+  resolveMultiTimeframeLayout,
+  serializeMultiTimeframeLayout,
   updateMultiTimeframeSymbol,
   updateMultiTimeframeWindow,
   type MultiTimeframeTimeframe,
@@ -29,16 +25,7 @@ import {
 import { MultiTimeframeGrid } from "./MultiTimeframeGrid";
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
-const marketDataBaseUrl = process.env.NEXT_PUBLIC_MARKET_DATA_BASE_URL ?? "http://localhost:8101";
-const marketWebSocketUrl = process.env.NEXT_PUBLIC_MARKET_WS_URL ?? "ws://localhost:8000/ws/market";
-
-function positiveNumber(value: string | undefined, fallback: number): number {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
-}
-
-const reconnectBaseMs = positiveNumber(process.env.NEXT_PUBLIC_MARKET_WS_RECONNECT_MS, 1000);
-const reconnectMaxMs = positiveNumber(process.env.NEXT_PUBLIC_MARKET_WS_MAX_RECONNECT_MS, 15000);
+const CHART_TIMEZONES = ["UTC", "Asia/Bangkok"] as const;
 
 const SYMBOLS = [
   { value: "BTCUSDT", label: "BTC / USDT", provider: "Binance" },
@@ -51,126 +38,33 @@ const SYMBOLS = [
   { value: "US100", label: "US 100", provider: "Oanda" },
 ] as const;
 
-const TIMEFRAMES = ["1m", "5m", "15m", "1h", "4h", "1d"] as const;
-type Timeframe = (typeof TIMEFRAMES)[number];
 type PreferenceStatus = "loading" | "ready" | "saving" | "error";
-type RealtimeStatus =
-  | "disabled"
-  | "connecting"
-  | "connected"
-  | "reconnecting"
-  | "source-reconnecting"
-  | "error";
-
-const TIMEFRAME_SECONDS: Record<Timeframe, number> = {
-  "1m": 60,
-  "5m": 300,
-  "15m": 900,
-  "1h": 3600,
-  "4h": 14400,
-  "1d": 86400,
-};
-
-type ApiCandle = {
-  symbol: string;
-  timeframe: string;
-  timestamp: string;
-  open: string | number;
-  high: string | number;
-  low: string | number;
-  close: string | number;
-  volume: string | number;
-};
-
-function normalizeCandles(payload: unknown): Candle[] {
-  if (!Array.isArray(payload)) {
-    throw new Error("Market data response is not a candle list.");
-  }
-
-  return payload.map((item) => {
-    const candle = item as ApiCandle;
-    const normalized = {
-      symbol: String(candle.symbol),
-      timeframe: String(candle.timeframe),
-      timestamp: String(candle.timestamp),
-      open: Number(candle.open),
-      high: Number(candle.high),
-      low: Number(candle.low),
-      close: Number(candle.close),
-      volume: Number(candle.volume),
-    };
-    if (
-      !normalized.symbol ||
-      !normalized.timeframe ||
-      !Number.isFinite(Date.parse(normalized.timestamp)) ||
-      ![normalized.open, normalized.high, normalized.low, normalized.close, normalized.volume].every(Number.isFinite)
-    ) {
-      throw new Error("Market data response contains an invalid candle.");
-    }
-    return normalized;
-  });
-}
-
-function getRealtimeStatusLabel(status: RealtimeStatus, retryDelayMs: number | null): string {
-  switch (status) {
-    case "disabled":
-      return "Historical data";
-    case "connected":
-      return "Realtime";
-    case "reconnecting":
-      return retryDelayMs ? `Retrying in ${Math.ceil(retryDelayMs / 1000)}s` : "Reconnecting";
-    case "source-reconnecting":
-      return "Market source reconnecting";
-    case "error":
-      return "Stream unavailable";
-    default:
-      return "Connecting stream";
-  }
-}
-
-async function getErrorMessage(response: Response): Promise<string> {
-  try {
-    const payload = (await response.json()) as { detail?: unknown };
-    if (typeof payload.detail === "string") {
-      return payload.detail;
-    }
-  } catch {
-    // Use the status fallback below.
-  }
-  return `Market data request failed (${response.status}).`;
-}
 
 export function ChartWorkspace({ initialSymbol }: { initialSymbol?: string }) {
   const normalizedInitialSymbol = SYMBOLS.some((item) => item.value === initialSymbol?.toUpperCase())
     ? initialSymbol?.toUpperCase() ?? "BTCUSDT"
     : "BTCUSDT";
-  const initialProvider = SYMBOLS.find((item) => item.value === normalizedInitialSymbol)?.provider;
   const [symbol, setSymbol] = useState(normalizedInitialSymbol);
-  const [timeframe, setTimeframe] = useState<Timeframe>("15m");
-  const [historyRange, setHistoryRange] = useState<HistoryRange>(initialProvider === "Oanda" ? "30d" : "1d");
-  const [candles, setCandles] = useState<Candle[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [refreshVersion, setRefreshVersion] = useState(0);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [realtimeStatus, setRealtimeStatus] = useState<RealtimeStatus>("connecting");
-  const [retryDelayMs, setRetryDelayMs] = useState<number | null>(null);
+  const [latestPrice, setLatestPrice] = useState<number | null>(null);
+  const [timezone, setTimezone] = useState<string>("UTC");
   const [preferencesReady, setPreferencesReady] = useState(false);
   const [preferenceStatus, setPreferenceStatus] = useState<PreferenceStatus>("loading");
   const [multiTimeframeLayout, setMultiTimeframeLayout] = useState(() =>
     createDefaultMultiTimeframeLayout(normalizedInitialSymbol),
   );
-  const connectionVersionRef = useRef(0);
   const persistedPreferencesRef = useRef<ChartPreferences>({
     symbol: normalizedInitialSymbol,
     timeframe: "15m",
   });
+  const persistedMultiTimeframeLayoutRef = useRef<string | null>(
+    serializeMultiTimeframeLayout(createDefaultMultiTimeframeLayout(normalizedInitialSymbol)),
+  );
+  const persistedTimezoneRef = useRef("UTC");
   const settingsSaveQueueRef = useRef<Promise<void>>(Promise.resolve());
   const settingsSaveVersionRef = useRef(0);
   const selectedSymbol = SYMBOLS.find((item) => item.value === symbol) ?? SYMBOLS[0];
-  const latest = candles.at(-1)?.close;
-  const first = candles[0]?.open;
-  const change = latest !== undefined && first !== undefined ? ((latest - first) / first) * 100 : null;
+  const reviewProgress = getMultiTimeframeReviewProgress(multiTimeframeLayout);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -182,257 +76,85 @@ export function ChartWorkspace({ initialSymbol }: { initialSymbol?: string }) {
           settings,
           undefined,
           supportedSymbols,
-          TIMEFRAMES,
+          MULTI_TIMEFRAME_TIMEFRAMES,
         );
         const effectivePreferences = resolveChartPreferences(
           settings,
           initialSymbol,
           supportedSymbols,
-          TIMEFRAMES,
+          MULTI_TIMEFRAME_TIMEFRAMES,
         );
         persistedPreferencesRef.current = storedPreferences;
+        persistedMultiTimeframeLayoutRef.current = settings.multi_timeframe_layout
+          ? JSON.stringify(settings.multi_timeframe_layout)
+          : null;
+        persistedTimezoneRef.current = settings.timezone;
         setSymbol(effectivePreferences.symbol);
-        setMultiTimeframeLayout((current) =>
-          updateMultiTimeframeSymbol(current, effectivePreferences.symbol),
+        setTimezone(settings.timezone);
+        setMultiTimeframeLayout(
+          resolveMultiTimeframeLayout(
+            settings.multi_timeframe_layout,
+            effectivePreferences.symbol,
+            supportedSymbols,
+          ),
         );
-        setTimeframe(effectivePreferences.timeframe as Timeframe);
-        const provider = SYMBOLS.find((item) => item.value === effectivePreferences.symbol)?.provider;
-        setHistoryRange(provider === "Oanda" ? "30d" : "1d");
         setPreferenceStatus("ready");
       })
       .catch(() => {
-        if (!controller.signal.aborted) {
-          setPreferenceStatus("error");
-        }
+        if (!controller.signal.aborted) setPreferenceStatus("error");
       })
       .finally(() => {
-        if (!controller.signal.aborted) {
-          setPreferencesReady(true);
-        }
+        if (!controller.signal.aborted) setPreferencesReady(true);
       });
 
     return () => controller.abort();
   }, [initialSymbol]);
 
   useEffect(() => {
-    if (!preferencesReady) {
-      return;
-    }
-    const persisted = persistedPreferencesRef.current;
+    if (!preferencesReady) return;
     const patch: UserSettingsPatch = {};
-    if (symbol !== persisted.symbol) {
+    if (symbol !== persistedPreferencesRef.current.symbol) {
       patch.default_symbol = symbol;
     }
-    if (timeframe !== persisted.timeframe) {
-      patch.default_timeframe = timeframe;
+    if (timezone !== persistedTimezoneRef.current) {
+      patch.timezone = timezone;
     }
-    if (Object.keys(patch).length === 0) {
-      return;
+    const serializedLayout = serializeMultiTimeframeLayout(multiTimeframeLayout);
+    if (serializedLayout !== persistedMultiTimeframeLayoutRef.current) {
+      patch.multi_timeframe_layout = multiTimeframeLayout;
     }
+    if (Object.keys(patch).length === 0) return;
 
     const saveVersion = ++settingsSaveVersionRef.current;
     const operation = settingsSaveQueueRef.current
       .catch(() => undefined)
       .then(async () => {
-        if (settingsSaveVersionRef.current === saveVersion) {
-          setPreferenceStatus("saving");
-        }
+        if (settingsSaveVersionRef.current === saveVersion) setPreferenceStatus("saving");
         const updated = await patchUserSettings(apiBaseUrl, patch);
         persistedPreferencesRef.current = {
           symbol: updated.default_symbol,
           timeframe: updated.default_timeframe,
         };
+        persistedMultiTimeframeLayoutRef.current = updated.multi_timeframe_layout
+          ? serializeMultiTimeframeLayout(updated.multi_timeframe_layout)
+          : null;
+        persistedTimezoneRef.current = updated.timezone;
       });
     settingsSaveQueueRef.current = operation;
     void operation.then(
       () => {
-        if (settingsSaveVersionRef.current === saveVersion) {
-          setPreferenceStatus("ready");
-        }
+        if (settingsSaveVersionRef.current === saveVersion) setPreferenceStatus("ready");
       },
       () => {
-        if (settingsSaveVersionRef.current === saveVersion) {
-          setPreferenceStatus("error");
-        }
+        if (settingsSaveVersionRef.current === saveVersion) setPreferenceStatus("error");
       },
     );
-  }, [preferencesReady, symbol, timeframe]);
-
-  useEffect(() => {
-    if (!preferencesReady) {
-      return;
-    }
-    const controller = new AbortController();
-
-    async function loadCandles() {
-      setLoading(true);
-      setError(null);
-
-      const interval = TIMEFRAME_SECONDS[timeframe];
-      const endSeconds = Math.floor(Date.now() / 1000 / interval) * interval;
-      const startSeconds = historyStartSeconds(endSeconds, historyRange);
-      const params = new URLSearchParams({
-        symbol,
-        timeframe,
-        start: new Date(startSeconds * 1000).toISOString(),
-        end: new Date(endSeconds * 1000).toISOString(),
-      });
-
-      try {
-        const response = await fetch(`${marketDataBaseUrl}/market/candles?${params}`, {
-          signal: controller.signal,
-        });
-        if (!response.ok) {
-          throw new Error(await getErrorMessage(response));
-        }
-        setCandles(normalizeCandles(await response.json()));
-        setLastUpdated(new Date());
-      } catch (requestError) {
-        if (controller.signal.aborted) {
-          return;
-        }
-        setError(requestError instanceof Error ? requestError.message : "Unable to load market data.");
-      } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false);
-        }
-      }
-    }
-
-    void loadCandles();
-    return () => controller.abort();
-  }, [historyRange, preferencesReady, refreshVersion, symbol, timeframe]);
-
-  useEffect(() => {
-    const connectionVersion = ++connectionVersionRef.current;
-    if (loading) {
-      return;
-    }
-
-    let disposed = false;
-    let socket: WebSocket | null = null;
-    let reconnectTimer: number | null = null;
-    let reconnectAttempt = 0;
-
-    function isCurrentConnection() {
-      return !disposed && connectionVersionRef.current === connectionVersion;
-    }
-
-    function scheduleReconnect() {
-      if (!isCurrentConnection() || reconnectTimer !== null) {
-        return;
-      }
-      const delay = getReconnectDelay(reconnectAttempt, reconnectBaseMs, reconnectMaxMs);
-      reconnectAttempt += 1;
-      setRealtimeStatus("reconnecting");
-      setRetryDelayMs(delay);
-      reconnectTimer = window.setTimeout(() => {
-        reconnectTimer = null;
-        if (!isCurrentConnection()) {
-          return;
-        }
-        setRealtimeStatus("connecting");
-        setRetryDelayMs(null);
-        connect();
-      }, delay);
-    }
-
-    function connect() {
-      if (!isCurrentConnection()) {
-        return;
-      }
-      let activeSocket: WebSocket;
-      try {
-        activeSocket = new WebSocket(marketWebSocketUrl);
-      } catch {
-        window.setTimeout(scheduleReconnect, 0);
-        return;
-      }
-      socket = activeSocket;
-      let subscriptionSent = false;
-
-      activeSocket.addEventListener("open", () => {
-        if (!isCurrentConnection() || subscriptionSent) {
-          return;
-        }
-        subscriptionSent = true;
-        activeSocket.send(JSON.stringify({ type: "subscribe", symbol, timeframe }));
-      });
-      activeSocket.addEventListener("message", (event) => {
-        if (!isCurrentConnection()) {
-          return;
-        }
-        try {
-          const payload = JSON.parse(String(event.data)) as { type?: unknown; code?: unknown };
-          const pong = createHeartbeatPong(payload);
-          if (pong) {
-            activeSocket.send(JSON.stringify(pong));
-            return;
-          }
-          if (payload.type === "subscribed") {
-            reconnectAttempt = 0;
-            setRetryDelayMs(null);
-            setRealtimeStatus("connected");
-            return;
-          }
-          if (payload.type === "error") {
-            setRealtimeStatus(payload.code === "market_stream_reconnecting" ? "source-reconnecting" : "error");
-            return;
-          }
-          const candle = normalizeRealtimeCandle(payload, symbol, timeframe);
-          if (candle) {
-            setCandles((current) => mergeRealtimeCandle(current, candle));
-            setError(null);
-            setLastUpdated(new Date());
-            setRealtimeStatus("connected");
-          }
-        } catch {
-          setRealtimeStatus("error");
-        }
-      });
-      activeSocket.addEventListener("error", () => {
-        if (isCurrentConnection()) {
-          activeSocket.close();
-        }
-      });
-      activeSocket.addEventListener("close", () => {
-        if (isCurrentConnection()) {
-          scheduleReconnect();
-        }
-      });
-    }
-
-    connect();
-
-    return () => {
-      disposed = true;
-      connectionVersionRef.current += 1;
-      if (reconnectTimer !== null) {
-        window.clearTimeout(reconnectTimer);
-      }
-      socket?.close(1000, "Subscription changed");
-    };
-  }, [loading, selectedSymbol.provider, symbol, timeframe]);
+  }, [multiTimeframeLayout, preferencesReady, symbol, timezone]);
 
   function selectSymbol(nextSymbol: string) {
-    connectionVersionRef.current += 1;
-    const nextProvider = SYMBOLS.find((item) => item.value === nextSymbol)?.provider;
-    setRealtimeStatus(nextProvider ? "connecting" : "disabled");
-    setRetryDelayMs(null);
-    setCandles([]);
-    setLastUpdated(null);
-    setHistoryRange(nextProvider === "Oanda" ? "30d" : "1d");
+    setLatestPrice(null);
     setMultiTimeframeLayout((current) => updateMultiTimeframeSymbol(current, nextSymbol));
     setSymbol(nextSymbol);
-  }
-
-  function selectHistoryRange(nextRange: HistoryRange) {
-    if (nextRange === historyRange) {
-      return;
-    }
-    setCandles([]);
-    setLastUpdated(null);
-    setHistoryRange(nextRange);
   }
 
   function selectReviewWindowCount(windowCount: (typeof MULTI_TIMEFRAME_WINDOW_COUNTS)[number]) {
@@ -449,18 +171,6 @@ export function ChartWorkspace({ initialSymbol }: { initialSymbol?: string }) {
     setMultiTimeframeLayout((current) =>
       updateMultiTimeframeWindow(current, windowId, { reviewChecked }),
     );
-  }
-
-  function selectTimeframe(nextTimeframe: Timeframe) {
-    if (nextTimeframe === timeframe) {
-      return;
-    }
-    connectionVersionRef.current += 1;
-    setRealtimeStatus("connecting");
-    setRetryDelayMs(null);
-    setCandles([]);
-    setLastUpdated(null);
-    setTimeframe(nextTimeframe);
   }
 
   return (
@@ -489,59 +199,38 @@ export function ChartWorkspace({ initialSymbol }: { initialSymbol?: string }) {
                 : ""}
           </small>
         </label>
-        <div className="chart-timeframes" aria-label="Timeframe">
-          {TIMEFRAMES.map((item) => (
-            <button
-              key={item}
-              type="button"
-              className={timeframe === item ? "is-active" : undefined}
-              aria-pressed={timeframe === item}
-              onClick={() => selectTimeframe(item)}
-            >
-              {item}
-            </button>
-          ))}
-        </div>
-        <div className="chart-ranges" aria-label="History range">
-          {HISTORY_RANGES.map((item) => (
-            <button
-              key={item.value}
-              type="button"
-              className={historyRange === item.value ? "is-active" : undefined}
-              aria-pressed={historyRange === item.value}
-              onClick={() => selectHistoryRange(item.value)}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
+        <label className="chart-timezone-control">
+          <span>Chart timezone</span>
+          <select value={timezone} onChange={(event) => setTimezone(event.target.value)}>
+            {CHART_TIMEZONES.map((item) => (
+              <option key={item} value={item}>
+                {item === "Asia/Bangkok" ? "Bangkok (UTC+7)" : "UTC"}
+              </option>
+            ))}
+          </select>
+          <small>Candle open time</small>
+        </label>
         <div className="chart-market-summary">
           <div className="chart-quote">
-            <span>Latest close</span>
+            <span>Realtime price</span>
             <strong>
-              {latest === undefined
+              {latestPrice === null
                 ? "—"
-                : latest.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                : latestPrice.toLocaleString("en-US", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 5,
+                  })}
             </strong>
-            <small className={change !== null && change < 0 ? "is-negative" : undefined}>
-              {change === null ? "—" : `${change >= 0 ? "+" : ""}${change.toFixed(2)}%`}
-            </small>
+            <small>{selectedSymbol.label}</small>
           </div>
           <button
             type="button"
             className="chart-refresh-button"
-            aria-label="Refresh candles"
-            title="Refresh candles"
-            disabled={loading}
-            onClick={() => {
-              if (selectedSymbol.provider === "Binance") {
-                setRealtimeStatus("connecting");
-                setRetryDelayMs(null);
-              }
-              setRefreshVersion((version) => version + 1);
-            }}
+            aria-label="Refresh all chart windows"
+            title="Refresh all chart windows"
+            onClick={() => setRefreshVersion((version) => version + 1)}
           >
-            <RefreshCw className={loading ? "is-spinning" : undefined} aria-hidden="true" size={17} />
+            <RefreshCw aria-hidden="true" size={17} />
           </button>
         </div>
       </header>
@@ -565,54 +254,36 @@ export function ChartWorkspace({ initialSymbol }: { initialSymbol?: string }) {
             </button>
           ))}
         </div>
-        <small>{multiTimeframeLayout.windowCount} windows · shared symbol</small>
+        <div className="review-workspace-progress">
+          <strong aria-live="polite">
+            Reviewed {reviewProgress.reviewed}/{reviewProgress.total} timeframes
+          </strong>
+          <button
+            type="button"
+            onClick={() => setMultiTimeframeLayout((current) => clearMultiTimeframeReview(current))}
+            disabled={reviewProgress.reviewed === 0}
+          >
+            <RotateCcw size={14} aria-hidden="true" />
+            <span>Clear review</span>
+          </button>
+        </div>
       </section>
 
       <MultiTimeframeGrid
         layout={multiTimeframeLayout}
+        timezone={timezone}
+        refreshVersion={refreshVersion}
+        onLatestPriceChange={setLatestPrice}
         onTimeframeChange={selectReviewTimeframe}
         onReviewChange={setReviewChecked}
       />
 
-      <section className="chart-workspace" aria-labelledby="chart-heading">
-        <div className="chart-heading-row">
-          <div>
-            <p className="eyebrow">Price chart</p>
-            <h2 id="chart-heading">
-              {selectedSymbol.label} · {timeframe} · {HISTORY_RANGES.find((item) => item.value === historyRange)?.label}
-            </h2>
-          </div>
-          <div className="chart-data-meta">
-            <span
-              className={`data-status ${error || realtimeStatus === "error" ? "is-error" : realtimeStatus === "connected" ? "is-live" : "is-loading"}`}
-              aria-live="polite"
-            >
-              {error
-                ? "Unavailable"
-                : loading
-                  ? candles.length > 0
-                    ? "Refreshing"
-                    : "Loading"
-                  : getRealtimeStatusLabel(realtimeStatus, retryDelayMs)}
-            </span>
-            <small>{lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "Awaiting data"}</small>
-          </div>
-        </div>
-        <CandlestickChart
-          candles={candles}
-          symbol={symbol}
-          timeframe={timeframe}
-          height={460}
-          loading={loading && candles.length === 0}
-          error={error}
-        />
-        <p className="chart-attribution">
-          Charts by{" "}
-          <a href="https://www.tradingview.com" target="_blank" rel="noreferrer">
-            TradingView
-          </a>
-        </p>
-      </section>
+      <p className="chart-attribution">
+        Charts by{" "}
+        <a href="https://www.tradingview.com" target="_blank" rel="noreferrer">
+          TradingView
+        </a>
+      </p>
     </>
   );
 }

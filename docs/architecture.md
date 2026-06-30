@@ -39,9 +39,9 @@ The dashboard and chart watchlist panels call the API directly from the browser,
 
 User settings are also owned by the MVP user through a one-to-one `user_settings` row. `GET /settings` lazily creates defaults and `PATCH /settings` validates and persists symbol, timeframe, indicators, theme, and IANA timezone preferences.
 
-The chart waits for its initial settings read before requesting candles. Stored symbol/timeframe values initialize the controls; a valid symbol query from the watchlist takes precedence and is persisted. Subsequent selection writes use a serialized client queue so rapid changes cannot be overwritten by an older request finishing later.
+The chart waits for its initial settings read before requesting candles. The stored symbol initializes the workspace; a valid symbol query from the watchlist takes precedence and is persisted. The legacy default timeframe remains compatible in settings, while visible chart timeframes come from the persisted multi-timeframe layout. Subsequent selection writes use a serialized client queue so rapid changes cannot be overwritten by an older request finishing later.
 
-The chart also owns a prepared multi-timeframe review model with one shared symbol, 1/2/4/8 window-count presets, and independent timeframe/enabled/review state per window. Day 30.1 initializes four windows at 4h, 1h, 15m, and 5m while deliberately leaving the existing single-chart renderer and data flow unchanged.
+The chart owns one multi-timeframe review model with one shared symbol, 1/2/4/8 window-count presets, and independent timeframe/enabled/review state per window. The selected count is the complete chart surface: no additional legacy chart is rendered below it.
 
 MVP user mode is not an authentication system: there are no credentials, sessions, roles, permissions, or tenant boundaries. It must be disabled and replaced with authenticated request identity before public or multi-user deployment.
 
@@ -84,9 +84,9 @@ The Day 21 WebSocket path is intentionally isolated from exchange execution:
 6. Oanda fetches the current read-only candle every `OANDA_REALTIME_POLL_SECONDS`; both provider payloads normalize into the same OHLCV contract.
 7. A bounded queue broadcasts each update to all matching frontend clients.
 8. The chart replaces an epoch-matched last candle or appends a strictly newer candle.
-9. A symbol/timeframe change closes the frontend socket before opening a new subscription.
+9. The multi-window workspace opens one connection per unique visible timeframe; duplicate timeframe windows share the same update.
 10. The API sends heartbeat ids and closes clients that do not return matching pong messages before the stale timeout.
-11. Unexpected frontend disconnects retry with bounded exponential backoff; each new socket sends one subscription.
+11. Unexpected frontend disconnects retry independently with bounded exponential backoff; each new socket sends one subscription.
 12. The final unsubscribe cancels the upstream task; transient upstream failures trigger bounded exponential-backoff reconnects.
 
 The Binance source uses the market-data-only `data-stream.binance.vision` endpoint. The Oanda account pricing stream currently returns `403` for the configured practice account, so realtime Oanda candles use the account-independent instrument endpoint that the token can read. The WebSocket contract has no account mutation, order, or exchange-write capability.
@@ -106,6 +106,26 @@ The market-data request path is:
 9. The service reads the final range from PostgreSQL and returns normalized candles.
 
 For long chart ranges, adapters paginate before storage: Oanda splits requests below its 5000-candle limit and Binance advances through 1000-kline pages. The chart exposes fixed 1-day, 1-week, and 1-month windows; Oanda markets default to one month.
+
+Cache coverage uses one timeframe duration at the requested trailing edge, ensuring stale higher-timeframe rows cannot suppress a provider refresh. Oanda receives a wider tolerance only at the leading edge so requests beginning during the weekend can still reuse the first candle after market open. Daily maintenance breaks and weekend closures remain legitimate gaps in returned Oanda series.
+
+The multi-timeframe review UI supports 1m, 5m, 15m, 30m, 1h, 2h, 4h, and 1d presets. These remain direct provider timeframe requests; Oanda maps 2h to H2. Custom resampling and candle aggregation are deferred to Day 30.10 and later.
+
+Reviewed checkboxes are manual workflow state. Progress is calculated only from visible enabled windows, while Clear review resets the whole layout. Neither action publishes a signal, invokes a strategy, or creates a paper order.
+
+Multi-timeframe layouts persist in nullable JSONB on the one-to-one user settings row. Backend Pydantic schemas enforce the nested contract, while the frontend validates untrusted saved JSON again and falls back to a fresh four-window layout when necessary. Layout mutations share the serialized settings write queue used by chart preferences.
+
+Each enabled review window loads its own recent 120-candle range through the normalized frontend candles client. Window components isolate candle, loading, error, and abort state, then render the existing `CandlestickChart`. A workspace-level realtime manager subscribes once per unique visible timeframe and routes normalized candles to matching windows. The latest received quote synchronizes the active candle close/high/low across all visible charts while each chart retains its own bucket timestamp and historical series. Provider-native 30m and 2h streams map to Oanda M30 and H2; this stage does not aggregate or synthesize historical candles.
+
+Each `CandlestickChart` owns its viewport controls. Right-clicking a loaded canvas suppresses the browser context menu, fits the loaded time range, and restores automatic right-price-axis scaling for that chart only. This reset changes presentation state without fetching data, reconnecting streams, or modifying settings.
+
+Provider candle timestamps remain timezone-aware UTC opening instants in transport, storage, and Lightweight Charts coordinates. Time-axis ticks and crosshair labels format that opening instant using the persisted IANA chart timezone, currently selectable between UTC and Asia/Bangkok. A closing instant may be derived by adding the timeframe duration, but it does not shift the candle coordinate; this matches TradingView's convention where a 5m candle opened at 14:55 is selected as 14:55 rather than 15:00.
+
+Custom timeframe work begins with pure parser and aggregation utilities in the market-data service. The parser canonicalizes positive integer minute/hour/day strings and exposes duration milliseconds without knowing providers, storage, or HTTP. `CandleAggregator` sorts source candles and groups them into Unix-epoch-aligned UTC buckets, producing deterministic OHLCV values with the bucket start as the timestamp. It requires one symbol, one source timeframe, and an exact target/source duration multiple.
+
+Aggregated output uses an `AggregatedCandle` contract with complementary `closed` and `partial` flags. Bucket state is deterministic against a timezone-aware evaluation instant: a bucket is closed when its UTC end is at or before that instant. Chart consumers can retain the active partial candle, while backtest/replay consumers call the same utility with partial output excluded. Provider capability routing, API acceptance, persistence, and cache integration remain separate later stages, so existing `/market/candles` behavior is unchanged.
+
+Direct timeframe support is described by an immutable capability registry built from each adapter's own constants. Oanda is the primary read-only CFD/FX candle source, while Binance public is a read-only spot-crypto development source. Every entry carries provider, venue, market type, data type, intended use, direct timeframes, and safety state. Capability lookup can distinguish a direct interval from a valid custom interval that needs aggregation without making an upstream request.
 
 ### Provider Contract
 

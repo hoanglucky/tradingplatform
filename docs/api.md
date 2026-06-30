@@ -128,7 +128,7 @@ Connect to `ws://localhost:8000/ws/market`, then send a subscription:
 }
 ```
 
-Supported timeframes are `1m`, `5m`, `15m`, `1h`, `4h`, and `1d`. Symbols are normalized to uppercase.
+Supported timeframes are `1m`, `5m`, `15m`, `30m`, `1h`, `2h`, `4h`, and `1d`. Symbols are normalized to uppercase.
 
 The server first acknowledges the active subscription:
 
@@ -186,7 +186,7 @@ A client that does not return a matching pong before `MARKET_WS_STALE_SECONDS` i
 
 The API shares one upstream source between clients using the same symbol/timeframe. If a provider disconnects, clients receive a `market_stream_reconnecting` error event while the hub retries with bounded exponential backoff. The queue for each client is bounded; when a client cannot keep up, the oldest pending update is replaced by newer market data.
 
-Realtime support includes Binance-listed symbols plus Oanda `XAUUSD`, `SP500`, and `US100`. Oanda updates the current read-only instrument candle every two seconds by default because the configured account pricing stream returns `403`.
+Realtime support includes Binance-listed symbols plus Oanda `XAUUSD`, `SP500`, and `US100`. Oanda maps `30m` to `M30` and `2h` to `H2`, and updates the current read-only instrument candle every two seconds by default because the configured account pricing stream returns `403`.
 
 Configuration:
 
@@ -367,6 +367,10 @@ Returns the current persisted preferences.
 ### `PATCH /settings`
 
 Accepts any subset of `default_symbol`, `default_timeframe`, `selected_indicators`, `theme`, and `timezone`. The default symbol must exist in the active catalog; timeframe and theme use fixed choices; indicators use unique lowercase slug names; timezone must be a valid IANA name.
+
+The chart uses `timezone` only to format candle opening times on its axis and crosshair. Provider and database candle timestamps remain UTC opening instants; derived close times do not shift chart coordinates.
+
+It also accepts `multi_timeframe_layout` with one active catalog symbol, `windowCount` of 1/2/4/8, and up to eight uniquely identified windows containing timeframe, enabled, and manual `reviewChecked` state. Invalid nested layouts return `422`; unknown active symbols return `404`.
 
 ```json
 {

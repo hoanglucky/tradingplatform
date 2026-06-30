@@ -14,6 +14,7 @@ Current files:
 - `apps/api/migrations/versions/20260619_0002_core_tables.py` creates the first core tables.
 - `apps/api/migrations/versions/20260629_0003_oanda_index_symbols.py` assigns index CFDs to Oanda.
 - `apps/api/migrations/versions/20260629_0004_user_settings.py` adds one-to-one user preferences.
+- `apps/api/migrations/versions/20260630_0005_multi_timeframe_layout.py` adds persisted review layouts.
 
 ## Connection
 
@@ -86,6 +87,8 @@ Important constraints and indexes:
 - `user_settings.user_id` is unique and cascades when its owner is deleted.
 
 The settings row stores the active default symbol, supported timeframe, JSON indicator slug list, theme, and IANA timezone. Repository creation uses a conflict-safe insert so concurrent first reads still produce one row per user.
+
+`user_settings.multi_timeframe_layout` is nullable JSONB for backward compatibility. API schemas validate its shared symbol, window count, unique window IDs, timeframe presets, enabled flags, and manual review flags before persistence.
 
 ## Day 6 Scope
 

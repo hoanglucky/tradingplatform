@@ -6,7 +6,7 @@ export type ChartPreferences = {
 };
 
 export type UserSettingsPatch = Partial<
-  Pick<UserSettings, "default_symbol" | "default_timeframe">
+  Pick<UserSettings, "default_symbol" | "default_timeframe" | "timezone" | "multi_timeframe_layout">
 >;
 
 export function resolveChartPreferences(

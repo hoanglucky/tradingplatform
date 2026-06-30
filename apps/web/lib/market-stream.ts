@@ -86,3 +86,17 @@ export function mergeRealtimeCandle(candles: Candle[], nextCandle: Candle, limit
   }
   return [...candles, nextCandle].slice(-limit);
 }
+
+export function synchronizeLatestCandlePrice(candles: Candle[], price: number): Candle[] {
+  if (candles.length === 0 || !Number.isFinite(price) || price <= 0) {
+    return candles;
+  }
+  const latest = candles[candles.length - 1];
+  const synchronized = {
+    ...latest,
+    high: Math.max(latest.high, price),
+    low: Math.min(latest.low, price),
+    close: price,
+  };
+  return [...candles.slice(0, -1), synchronized];
+}

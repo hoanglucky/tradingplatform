@@ -14,6 +14,96 @@ Use this file to track task-level handoff notes for Codex sessions.
 
 ## Completed
 
+### 2026-06-30 - Day 30.12 closed versus partial candle handling
+
+Implemented:
+
+- Added explicit complementary `closed` and `partial` aggregate candle flags.
+- Added deterministic timezone-aware lifecycle evaluation with an injectable `as_of`.
+- Included the active partial candle by default for chart consumers.
+- Added `include_partial=False` for backtest and replay consumers.
+
+Verified:
+
+- `npm run market-data-test` passed all 68 tests.
+- Ruff passed for schemas, aggregator, and aggregator tests.
+
+Next task: Day 30.13 provider capability map.
+
+### 2026-06-30 - Day 30.9.2 Oanda trailing candle cache repair
+
+Implemented:
+
+- Restricted Oanda's three-day cache tolerance to the leading range edge.
+- Required exact timeframe-duration coverage at the trailing edge.
+- Backfilled stale XAUUSD higher-timeframe ranges from Oanda.
+- Preserved legitimate market maintenance and weekend gaps.
+
+Verified:
+
+- `npm run market-data-test` passed all 64 tests.
+- Live diagnostics show current completed tails for 1m through 4h.
+
+### 2026-06-30 - Day 30.9.1 candle timestamp and timezone alignment
+
+Implemented:
+
+- Kept chart coordinates on UTC provider candle opening timestamps, matching TradingView.
+- Retained close timestamps as derived metadata without shifting candle selection labels.
+- Added consistent timezone-aware opening-time axis and crosshair formatting to every chart window.
+- Added persisted UTC and Asia/Bangkok chart timezone selection.
+- Kept provider payloads and PostgreSQL timestamps unchanged.
+
+Verified:
+
+- `npm run web-test` passed lint, 45 tests, typecheck, and production build.
+
+### 2026-06-30 - Day 30.9 right-click chart view reset
+
+Implemented:
+
+- Added a reusable chart viewport reset utility.
+- Right-click now fits all loaded candles and restores automatic price scaling.
+- Applied the interaction independently to every multi-timeframe chart canvas.
+- Kept data loading, realtime connections, and persistence unchanged.
+
+Verified:
+
+- `npm run web-test` passed lint, 40 tests, typecheck, and production build.
+
+### 2026-06-30 - Day 30.8 multi-window realtime synchronization
+
+Implemented:
+
+- Removed the duplicate legacy chart below the selected multi-window layout.
+- Rendered exactly 1/2/4/8 chart windows, with a full-height single-window mode.
+- Added one reconnecting WebSocket per unique visible timeframe and shared duplicate subscriptions.
+- Synchronized active candle prices across all windows while preserving timeframe buckets.
+- Added API realtime support for 30m and 2h.
+
+Verified:
+
+- `npm run web-test` passed lint, 38 tests, typecheck, and production build.
+- `npm run api-test` passed all 56 tests; Ruff passed.
+- Live XAUUSD subscriptions returned candles for 4h, 1h, 5m, and 1m.
+- API and web containers are healthy on ports 8000 and 2000.
+
+### 2026-06-30 - Day 30.11 CandleAggregator base utility
+
+Implemented:
+
+- Added a pure candle aggregation utility for fixed UTC buckets.
+- Implemented deterministic open, high, low, close, volume, and timestamp aggregation.
+- Validated source consistency and exact target/source duration divisibility.
+- Covered 1m to 5m, 6m, 7m, and 15m aggregation, normalized timeframe values, and invalid inputs.
+
+Verified:
+
+- `npm run market-data-test` passed all 63 tests.
+- Ruff passed for the aggregator and its tests.
+
+Next task: Day 30.12 closed versus partial candle handling.
+
 ### 2026-06-18 - Day 1 foundation
 
 Implemented:
@@ -147,15 +237,128 @@ Verified:
 
 ## Next task candidate
 
-### Day 30.4 - Extended timeframe presets
+### Day 30.14 - CandleService aggregate fallback
 
 Suggested scope:
 
-- Add 30m and 2h review timeframe options.
-- Use the final distinct defaults for 1/2/4/8 layouts.
-- Keep the old single-chart timeframe selector unchanged.
+- Return an exact cached target timeframe when coverage is sufficient.
+- Fetch provider candles directly when the capability registry supports the target.
+- Otherwise choose a smaller direct base timeframe and aggregate to the target.
+- Upsert normalized target candles without mixing provider market types.
 
 ## Recently completed
+
+### Day 30.13 - Provider capability map
+
+Implemented:
+
+- Added an immutable direct candle capability registry sourced from adapter constants.
+- Added source metadata and explicit Oanda/Binance intended-use boundaries.
+- Added direct support and aggregate-required lookup helpers.
+
+Verified:
+
+- 18 capability cases pass within the 86-test market-data suite.
+- Ruff checks pass for capability implementation and tests.
+
+### Day 30.12 - Closed versus partial candle handling
+
+Implemented:
+
+- Added complementary lifecycle flags to aggregated candles.
+- Added deterministic `as_of` evaluation and exact bucket-end closure.
+- Added chart-default partial inclusion and backtest partial exclusion.
+
+Verified:
+
+- 15 aggregator cases pass within the 68-test market-data suite.
+- Container smoke testing confirms chart and backtest output modes.
+
+### Day 30.11 - CandleAggregator base utility
+
+Implemented:
+
+- Added fixed UTC bucket aggregation with deterministic OHLCV output.
+- Added normalized source/target validation and exact duration divisibility checks.
+- Kept aggregation pure and disconnected from provider, storage, and API routing.
+
+Verified:
+
+- 11 aggregator cases pass within the 63-test market-data suite.
+- Ruff checks pass for aggregator implementation and tests.
+
+### Day 30.10 - Timeframe parser and validation
+
+Implemented:
+
+- Added canonical minute/hour/day timeframe parsing and normalization.
+- Added duration milliseconds and a bounded 31-day safety limit.
+- Added a domain validation error for malformed and unsafe values.
+- Kept the utility disconnected from the API pending Day 30.15.
+
+Verified:
+
+- 20 parser cases pass within the 52-test market-data suite.
+- Ruff checks pass for parser implementation and tests.
+
+### Day 30.7 - Connect multi-window candles
+
+Implemented:
+
+- Extracted a shared normalized market-candles client.
+- Added independent fetch, abort, loading, and error state per enabled review window.
+- Reused `CandlestickChart` for every review window and retained the legacy chart.
+- Requested direct provider timeframes with no aggregation.
+
+Verified:
+
+- Shared client range, normalization, and error tests pass.
+- `npm run web-test` passes lint, 36 tests, typecheck, and production build.
+- Direct API smoke tests return data for all four persisted window timeframes.
+
+### Day 30.6 - Persist multi-timeframe layout
+
+Implemented:
+
+- Added JSONB layout persistence and Alembic migration `20260630_0005`.
+- Added nested backend validation and active-symbol checks.
+- Added shared frontend contracts, runtime validation, invalid fallback, and queued saves.
+- Preserved existing user settings fields and behavior.
+
+Verified:
+
+- Backend suite passes 52 tests and Ruff.
+- Frontend suite passes 33 tests, lint, typecheck, and production build.
+- Live API save/reload returned XAUUSD with four persisted windows.
+
+### Day 30.5 - Review checkbox workflow
+
+Implemented:
+
+- Added per-window Reviewed progress for visible/enabled windows.
+- Added Clear review with a familiar reset icon and disabled empty state.
+- Cleared hidden as well as visible review checks to avoid stale restored state.
+- Kept review workflow local and disconnected from all trading behavior.
+
+Verified:
+
+- Progress visibility and clear-all tests pass.
+- `npm run web-test` passes lint, 29 tests, typecheck, and production build.
+
+### Day 30.4 - Extended timeframe presets
+
+Implemented:
+
+- Added review-only 30m and 2h timeframe options.
+- Added final default presets for 1/2/4/8 window layouts.
+- Added eight distinct defaults for the 8-window layout.
+- Added direct OANDA H2 mapping without aggregation.
+
+Verified:
+
+- `npm run web-test` passes lint, 27 tests, typecheck, and production build.
+- `npm run market-data-test` passes all 32 tests.
+- The existing single-chart timeframe selector remains unchanged.
 
 ### Day 30.3 - Multi-timeframe grid UI
 

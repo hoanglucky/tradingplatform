@@ -10,6 +10,7 @@ Current contracts live in `services/market-data/app`:
 - `providers.py`
 - `adapters/binance.py`
 - `adapters/oanda.py`
+- `provider_capabilities.py`
 
 ## Provider Interface
 
@@ -75,6 +76,16 @@ Symbol mapping currently includes:
 - `US100` -> `NAS100_USD`
 
 The adapter sends the token as an `Authorization: Bearer ...` header, per Oanda v20 authentication. It does not place, modify, or close orders.
+
+## Provider Capabilities
+
+The immutable provider capability registry reports whether a candle timeframe is available directly before a request is sent.
+
+- Oanda: primary read-only CFD/FX market data.
+- Binance public: read-only spot-crypto development data.
+- Oanda 6m, 7m, 45m, and 3h: valid custom intervals that require later aggregate fallback.
+
+Each entry includes `provider`, `venue`, `market_type`, `data_type`, `intended_use`, `direct_timeframes`, and `read_only`. The direct timeframe sets come from the adapter constants to prevent registry drift. Day 30.14 consumes this lookup for direct-versus-aggregate routing.
 
 ## Tests
 

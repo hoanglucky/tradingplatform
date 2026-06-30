@@ -9,13 +9,17 @@ import {
   type CandlestickData,
   type IChartApi,
   type ISeriesApi,
+  type Time,
   type UTCTimestamp,
 } from "lightweight-charts";
+import { resetCandlestickChartView } from "../lib/chart-view";
+import { candleOpenTimestampSeconds, formatChartTime } from "../lib/chart-time";
 
 export type CandlestickChartProps = {
   candles: Candle[];
   symbol: string;
   timeframe: string;
+  timezone: string;
   height: number;
   loading: boolean;
   error: string | null;
@@ -24,7 +28,7 @@ export type CandlestickChartProps = {
 function toChartData(candles: Candle[]): CandlestickData<UTCTimestamp>[] {
   return candles
     .map((candle) => ({
-      time: Math.floor(new Date(candle.timestamp).getTime() / 1000) as UTCTimestamp,
+      time: candleOpenTimestampSeconds(candle.timestamp) as UTCTimestamp,
       open: candle.open,
       high: candle.high,
       low: candle.low,
@@ -38,6 +42,7 @@ export function CandlestickChart({
   candles,
   symbol,
   timeframe,
+  timezone,
   height,
   loading,
   error,
@@ -63,6 +68,9 @@ export function CandlestickChart({
         textColor: "#5e6b78",
         attributionLogo: false,
       },
+      localization: {
+        timeFormatter: (time: Time) => formatChartTime(time, timezone, "crosshair"),
+      },
       grid: {
         vertLines: { color: "#eef1f4" },
         horzLines: { color: "#eef1f4" },
@@ -73,6 +81,8 @@ export function CandlestickChart({
       timeScale: {
         borderColor: "#d8dee6",
         timeVisible: true,
+        secondsVisible: timeframe === "1m",
+        tickMarkFormatter: (time: Time) => formatChartTime(time, timezone, "axis"),
       },
       crosshair: {
         vertLine: { color: "#718096", labelBackgroundColor: "#17202a" },
@@ -103,7 +113,7 @@ export function CandlestickChart({
       resizeObserver.disconnect();
       chart.remove();
     };
-  }, [chartHeight, error, hasData, loading]);
+  }, [chartHeight, error, hasData, loading, timeframe, timezone]);
 
   useEffect(() => {
     if (!loading && !error && seriesRef.current) {
@@ -113,7 +123,7 @@ export function CandlestickChart({
         fitContentRef.current = false;
       }
     }
-  }, [candles, error, loading]);
+  }, [candles, error, loading, timeframe]);
 
   if (loading) {
     return (
@@ -150,6 +160,10 @@ export function CandlestickChart({
       className="chart-canvas"
       style={{ height: chartHeight, minHeight: chartHeight }}
       aria-label={`${symbol} ${timeframe} candlestick chart`}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        resetCandlestickChartView(chartRef.current);
+      }}
     />
   );
 }

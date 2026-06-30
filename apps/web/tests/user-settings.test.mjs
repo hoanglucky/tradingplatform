@@ -15,6 +15,7 @@ const settings = {
   selected_indicators: [],
   theme: "system",
   timezone: "UTC",
+  multi_timeframe_layout: null,
   created_at: "2026-06-29T00:00:00Z",
   updated_at: "2026-06-29T00:00:00Z",
 };
@@ -89,4 +90,30 @@ test("patches chart preferences through the API", async (context) => {
   });
   assert.equal(updated.default_symbol, "SP500");
   assert.equal(updated.default_timeframe, "1h");
+});
+
+test("patches a multi-timeframe layout through the API", async (context) => {
+  const originalFetch = globalThis.fetch;
+  context.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+  const layout = {
+    symbol: "XAUUSD",
+    windowCount: 1,
+    windows: [
+      { id: "w1", timeframe: "15m", enabled: true, reviewChecked: true },
+    ],
+  };
+  globalThis.fetch = async (_url, init) => {
+    assert.deepEqual(JSON.parse(String(init?.body)), { multi_timeframe_layout: layout });
+    return new Response(JSON.stringify({ ...settings, multi_timeframe_layout: layout }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  };
+
+  const updated = await patchUserSettings("http://api.test", {
+    multi_timeframe_layout: layout,
+  });
+  assert.deepEqual(updated.multi_timeframe_layout, layout);
 });

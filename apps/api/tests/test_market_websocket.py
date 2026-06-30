@@ -128,6 +128,23 @@ def test_market_websocket_rejects_invalid_subscription(monkeypatch) -> None:
     assert hub.subscriptions == []
 
 
+@pytest.mark.parametrize("timeframe", ["30m", "2h"])
+def test_market_websocket_accepts_extended_timeframes(monkeypatch, timeframe) -> None:
+    hub = FakeMarketStreamHub()
+    monkeypatch.setattr(market_websocket_routes, "market_stream_hub", hub)
+
+    with client.websocket_connect("/ws/market") as websocket:
+        websocket.send_json(
+            {"type": "subscribe", "symbol": "XAUUSD", "timeframe": timeframe}
+        )
+        acknowledgement = websocket.receive_json()
+
+        assert acknowledgement["type"] == "subscribed"
+        assert acknowledgement["timeframe"] == timeframe
+
+    assert hub.wait_for_unsubscriptions(1)
+
+
 def test_market_websocket_replaces_active_subscription(monkeypatch) -> None:
     hub = FakeMarketStreamHub()
     monkeypatch.setattr(market_websocket_routes, "market_stream_hub", hub)

@@ -427,7 +427,7 @@ h2 {
 
 .chart-toolbar {
   display: grid;
-  grid-template-columns: minmax(150px, 1fr) auto auto minmax(190px, 1fr);
+  grid-template-columns: minmax(150px, 1fr) auto minmax(190px, 1fr);
   align-items: center;
   gap: 18px;
   min-height: 64px;
@@ -446,8 +446,16 @@ h2 {
   gap: 3px;
 }
 
+.chart-timezone-control {
+  display: grid;
+  justify-items: start;
+  gap: 3px;
+}
+
 .chart-symbol-control > span,
 .chart-symbol-control small,
+.chart-timezone-control > span,
+.chart-timezone-control small,
 .chart-quote span,
 .chart-quote small {
   color: var(--muted);
@@ -465,6 +473,19 @@ h2 {
   font-size: 0.9rem;
   font-weight: 750;
   padding: 0 32px 0 10px;
+}
+
+.chart-timezone-control select {
+  min-width: 150px;
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 0 30px 0 9px;
 }
 
 .chart-timeframes,
@@ -509,6 +530,7 @@ h2 {
 .chart-timeframes button:focus-visible,
 .chart-ranges button:focus-visible,
 .chart-symbol-control select:focus-visible,
+.chart-timezone-control select:focus-visible,
 .chart-refresh-button:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
@@ -540,8 +562,7 @@ h2 {
   gap: 2px;
 }
 
-.review-workspace-title span,
-.review-workspace-toolbar small {
+.review-workspace-title span {
   color: var(--muted);
   font-size: 0.74rem;
 }
@@ -590,9 +611,48 @@ h2 {
   outline-offset: 2px;
 }
 
-.review-workspace-toolbar > small {
+.review-workspace-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   margin-left: auto;
-  text-align: right;
+}
+
+.review-workspace-progress > strong {
+  color: var(--muted);
+  font-size: 0.74rem;
+  white-space: nowrap;
+}
+
+.review-workspace-progress button {
+  display: flex;
+  min-height: 32px;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.74rem;
+  font-weight: 700;
+  padding: 0 9px;
+}
+
+.review-workspace-progress button:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent-strong);
+}
+
+.review-workspace-progress button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.review-workspace-progress button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .multi-timeframe-grid {
@@ -627,11 +687,30 @@ h2 {
   padding: 8px 10px;
 }
 
-.multi-timeframe-window-header > div {
+.multi-timeframe-window-identity {
   display: flex;
   min-width: 0;
   align-items: baseline;
   gap: 7px;
+}
+
+.multi-timeframe-live-price {
+  display: grid;
+  min-width: 96px;
+  gap: 2px;
+  justify-items: end;
+}
+
+.multi-timeframe-live-price span.is-live {
+  color: var(--accent-strong);
+  font-weight: 750;
+}
+
+.multi-timeframe-live-price strong {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .multi-timeframe-window-header span,
@@ -687,29 +766,6 @@ h2 {
 .review-window-check input:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
-}
-
-.review-window-placeholder {
-  display: grid;
-  min-height: 138px;
-  align-content: center;
-  justify-items: center;
-  gap: 4px;
-  background: var(--panel-soft);
-  color: var(--muted);
-}
-
-.multi-timeframe-grid.is-layout-1 .review-window-placeholder {
-  min-height: 260px;
-}
-
-.review-window-placeholder span {
-  font-size: 0.72rem;
-}
-
-.review-window-placeholder strong {
-  color: var(--ink);
-  font-size: 1rem;
 }
 
 .chart-quote strong {
@@ -877,11 +933,11 @@ h2 {
   }
 
   .chart-toolbar {
-    grid-template-columns: 1fr auto;
+    grid-template-columns: 1fr auto auto;
   }
 
   .chart-market-summary {
-    grid-column: 2;
+    grid-column: 3;
   }
 
   .chart-timeframes {
@@ -919,7 +975,12 @@ h2 {
     width: 100%;
   }
 
+  .chart-timezone-control select {
+    width: 100%;
+  }
+
   .chart-market-summary,
+  .chart-timezone-control,
   .chart-timeframes,
   .chart-ranges {
     grid-column: 1;
@@ -930,10 +991,10 @@ h2 {
     flex-wrap: wrap;
   }
 
-  .review-workspace-toolbar > small {
+  .review-workspace-progress {
     width: 100%;
     margin-left: 0;
-    text-align: left;
+    justify-content: space-between;
   }
 
   .multi-timeframe-grid,

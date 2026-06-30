@@ -1,56 +1,76 @@
+import type {
+  MultiTimeframeLayout,
+  MultiTimeframeTimeframe,
+  MultiTimeframeWindow,
+  MultiTimeframeWindowCount,
+} from "@trading-framework/shared";
+
+export type {
+  MultiTimeframeLayout,
+  MultiTimeframeTimeframe,
+  MultiTimeframeWindow,
+  MultiTimeframeWindowCount,
+} from "@trading-framework/shared";
+
 export const MULTI_TIMEFRAME_WINDOW_COUNTS = [1, 2, 4, 8] as const;
-export const MULTI_TIMEFRAME_TIMEFRAMES = ["1m", "5m", "15m", "1h", "4h", "1d"] as const;
-
-export type MultiTimeframeWindowCount = (typeof MULTI_TIMEFRAME_WINDOW_COUNTS)[number];
-export type MultiTimeframeTimeframe = "1m" | "5m" | "15m" | "1h" | "4h" | "1d";
-
-export type MultiTimeframeWindow = {
-  id: string;
-  timeframe: MultiTimeframeTimeframe;
-  enabled: boolean;
-  reviewChecked: boolean;
-};
-
-export type MultiTimeframeLayout = {
-  symbol: string;
-  windowCount: MultiTimeframeWindowCount;
-  windows: MultiTimeframeWindow[];
-};
-
-export const DEFAULT_MULTI_TIMEFRAME_WINDOWS: readonly MultiTimeframeWindow[] = [
-  { id: "w1", timeframe: "4h", enabled: true, reviewChecked: false },
-  { id: "w2", timeframe: "1h", enabled: true, reviewChecked: false },
-  { id: "w3", timeframe: "15m", enabled: true, reviewChecked: false },
-  { id: "w4", timeframe: "5m", enabled: true, reviewChecked: false },
-];
-
-const ADDITIONAL_WINDOW_TIMEFRAMES: readonly MultiTimeframeTimeframe[] = [
-  "1d",
+export const MULTI_TIMEFRAME_TIMEFRAMES = [
   "1m",
-  "4h",
+  "5m",
   "15m",
-];
+  "30m",
+  "1h",
+  "2h",
+  "4h",
+  "1d",
+] as const;
 
-function createWindow(index: number): MultiTimeframeWindow {
-  const defaultWindow = DEFAULT_MULTI_TIMEFRAME_WINDOWS[index];
-  return defaultWindow
-    ? { ...defaultWindow }
-    : {
-        id: `w${index + 1}`,
-        timeframe: ADDITIONAL_WINDOW_TIMEFRAMES[
-          (index - DEFAULT_MULTI_TIMEFRAME_WINDOWS.length) % ADDITIONAL_WINDOW_TIMEFRAMES.length
-        ],
-        enabled: true,
-        reviewChecked: false,
-      };
+export type MultiTimeframeReviewProgress = {
+  reviewed: number;
+  total: number;
+};
+
+export const DEFAULT_MULTI_TIMEFRAME_LAYOUT_TIMEFRAMES: Record<
+  MultiTimeframeWindowCount,
+  readonly MultiTimeframeTimeframe[]
+> = {
+  1: ["15m"],
+  2: ["1h", "15m"],
+  4: ["4h", "1h", "15m", "5m"],
+  8: ["1d", "4h", "2h", "1h", "30m", "15m", "5m", "1m"],
+};
+
+export const DEFAULT_MULTI_TIMEFRAME_WINDOWS: readonly MultiTimeframeWindow[] =
+  DEFAULT_MULTI_TIMEFRAME_LAYOUT_TIMEFRAMES[4].map((timeframe, index) => ({
+    id: `w${index + 1}`,
+    timeframe,
+    enabled: true,
+    reviewChecked: false,
+  }));
+
+function createWindow(index: number, windowCount: MultiTimeframeWindowCount): MultiTimeframeWindow {
+  return {
+    id: `w${index + 1}`,
+    timeframe: DEFAULT_MULTI_TIMEFRAME_LAYOUT_TIMEFRAMES[windowCount][index],
+    enabled: true,
+    reviewChecked: false,
+  };
+}
+
+export function createMultiTimeframeLayout(
+  symbol: string,
+  windowCount: MultiTimeframeWindowCount,
+): MultiTimeframeLayout {
+  return {
+    symbol: symbol.trim().toUpperCase(),
+    windowCount,
+    windows: DEFAULT_MULTI_TIMEFRAME_LAYOUT_TIMEFRAMES[windowCount].map((_, index) =>
+      createWindow(index, windowCount),
+    ),
+  };
 }
 
 export function createDefaultMultiTimeframeLayout(symbol: string): MultiTimeframeLayout {
-  return {
-    symbol: symbol.trim().toUpperCase(),
-    windowCount: 4,
-    windows: DEFAULT_MULTI_TIMEFRAME_WINDOWS.map((window) => ({ ...window })),
-  };
+  return createMultiTimeframeLayout(symbol, 4);
 }
 
 export function updateMultiTimeframeSymbol(
@@ -70,7 +90,7 @@ export function resizeMultiTimeframeLayout(
     enabled: index < windowCount,
   }));
   while (windows.length < windowCount) {
-    windows.push(createWindow(windows.length));
+    windows.push(createWindow(windows.length, windowCount));
   }
   return { ...layout, windowCount, windows };
 }
@@ -93,4 +113,97 @@ export function updateMultiTimeframeWindow(
 
 export function visibleMultiTimeframeWindows(layout: MultiTimeframeLayout): MultiTimeframeWindow[] {
   return layout.windows.filter((window) => window.enabled).slice(0, layout.windowCount);
+}
+
+export function uniqueVisibleMultiTimeframeTimeframes(
+  layout: MultiTimeframeLayout,
+): MultiTimeframeTimeframe[] {
+  return [...new Set(visibleMultiTimeframeWindows(layout).map((window) => window.timeframe))];
+}
+
+export function getMultiTimeframeReviewProgress(
+  layout: MultiTimeframeLayout,
+): MultiTimeframeReviewProgress {
+  const visibleWindows = visibleMultiTimeframeWindows(layout);
+  return {
+    reviewed: visibleWindows.filter((window) => window.reviewChecked).length,
+    total: visibleWindows.length,
+  };
+}
+
+export function clearMultiTimeframeReview(layout: MultiTimeframeLayout): MultiTimeframeLayout {
+  if (!layout.windows.some((window) => window.reviewChecked)) {
+    return layout;
+  }
+  return {
+    ...layout,
+    windows: layout.windows.map((window) =>
+      window.reviewChecked ? { ...window, reviewChecked: false } : window,
+    ),
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+export function resolveMultiTimeframeLayout(
+  value: unknown,
+  activeSymbol: string,
+  supportedSymbols: readonly string[],
+): MultiTimeframeLayout {
+  const fallback = createDefaultMultiTimeframeLayout(activeSymbol);
+  if (!isRecord(value)) {
+    return fallback;
+  }
+  const symbol = typeof value.symbol === "string" ? value.symbol.trim().toUpperCase() : "";
+  const windowCount = value.windowCount;
+  const windows = value.windows;
+  if (
+    !supportedSymbols.includes(symbol) ||
+    !MULTI_TIMEFRAME_WINDOW_COUNTS.some((count) => count === windowCount) ||
+    !Array.isArray(windows) ||
+    windows.length < Number(windowCount) ||
+    windows.length > 8
+  ) {
+    return fallback;
+  }
+
+  const normalizedWindows: MultiTimeframeWindow[] = [];
+  const ids = new Set<string>();
+  for (const window of windows) {
+    if (!isRecord(window)) {
+      return fallback;
+    }
+    const id = typeof window.id === "string" ? window.id.trim() : "";
+    if (
+      !id ||
+      ids.has(id) ||
+      !MULTI_TIMEFRAME_TIMEFRAMES.some((timeframe) => timeframe === window.timeframe) ||
+      typeof window.enabled !== "boolean" ||
+      typeof window.reviewChecked !== "boolean"
+    ) {
+      return fallback;
+    }
+    ids.add(id);
+    normalizedWindows.push({
+      id,
+      timeframe: window.timeframe as MultiTimeframeTimeframe,
+      enabled: window.enabled,
+      reviewChecked: window.reviewChecked,
+    });
+  }
+
+  if (normalizedWindows.filter((window) => window.enabled).length !== windowCount) {
+    return fallback;
+  }
+  return {
+    symbol: activeSymbol.trim().toUpperCase(),
+    windowCount: windowCount as MultiTimeframeWindowCount,
+    windows: normalizedWindows,
+  };
+}
+
+export function serializeMultiTimeframeLayout(layout: MultiTimeframeLayout): string {
+  return JSON.stringify(layout);
 }

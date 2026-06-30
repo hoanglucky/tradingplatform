@@ -128,6 +128,23 @@ async def test_oanda_cache_allows_weekend_boundary_gap() -> None:
 
 
 @pytest.mark.anyio
+async def test_oanda_stale_trailing_cache_fetches_current_range() -> None:
+    start = datetime(2024, 6, 19, 8, 0, tzinfo=UTC)
+    end = start + timedelta(minutes=10)
+    cached = [make_candle(start), make_candle(start + timedelta(minutes=1))]
+    fetched = [make_candle(start + timedelta(minutes=index)) for index in range(10)]
+    repository = FakeRepository(cached)
+    provider = FakeProvider(fetched, exchange="oanda")
+    service = CandleStorageService(repository, provider)
+
+    result = await service.get_candles("XAUUSD", "1m", start, end)
+
+    assert provider.calls == 1
+    assert len(result) == 10
+    assert result[-1].timestamp == end - timedelta(minutes=1)
+
+
+@pytest.mark.anyio
 async def test_fetches_partial_range_and_deduplicates_before_upsert() -> None:
     start = datetime(2024, 6, 19, 8, 0, tzinfo=UTC)
     first = make_candle(start)

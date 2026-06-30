@@ -4,7 +4,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
-Timeframe = Literal["1m", "5m", "15m", "1h", "4h", "1d"]
+Timeframe = Literal["1m", "5m", "15m", "30m", "1h", "2h", "4h", "1d"]
 
 
 class MarketSubscription(BaseModel):
