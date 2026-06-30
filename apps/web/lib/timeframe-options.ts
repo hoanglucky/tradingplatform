@@ -17,6 +17,24 @@ export function normalizeChartTimeframe(value: string): string | null {
   return durationDays <= 31 ? `${amount}${unit}` : null;
 }
 
+export function chartTimeframeDurationMilliseconds(timeframe: string): number {
+  if (timeframe === "1M") return 31 * 86_400_000;
+  const match = /^([1-9][0-9]*)([mhdw])$/.exec(timeframe);
+  if (!match) return Number.POSITIVE_INFINITY;
+  const multiplier = { m: 60_000, h: 3_600_000, d: 86_400_000, w: 604_800_000 }[
+    match[2] as "m" | "h" | "d" | "w"
+  ];
+  return Number(match[1]) * multiplier;
+}
+
+export function sortChartTimeframes(timeframes: readonly string[]): string[] {
+  return [...new Set(timeframes)].sort((left, right) => {
+    const durationDifference =
+      chartTimeframeDurationMilliseconds(left) - chartTimeframeDurationMilliseconds(right);
+    return durationDifference || left.localeCompare(right);
+  });
+}
+
 export function parseStoredTimeframeFavorites(value: string | null): string[] {
   if (!value) return DEFAULT_TIMEFRAME_FAVORITES;
   try {
@@ -25,7 +43,7 @@ export function parseStoredTimeframeFavorites(value: string | null): string[] {
     const normalized = parsed
       .map((item) => (typeof item === "string" ? normalizeChartTimeframe(item) : null))
       .filter((item): item is string => item !== null);
-    return [...new Set(normalized)];
+    return sortChartTimeframes(normalized);
   } catch {
     return DEFAULT_TIMEFRAME_FAVORITES;
   }

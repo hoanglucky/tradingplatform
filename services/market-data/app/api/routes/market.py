@@ -18,7 +18,7 @@ from app.adapters.oanda import (
 )
 from app.db import get_db
 from app.providers import MarketDataProvider
-from app.schemas import Candle
+from app.schemas import CandleQueryResult
 from app.services.candle_storage import CandleStorageService
 from app.storage.candles import CandleRepository, SymbolNotFoundError
 from app.timeframes import TimeframeValidationError, normalize_timeframe
@@ -41,17 +41,17 @@ def get_candle_storage_service(
     return CandleStorageService(CandleRepository(db), provider)
 
 
-@router.get("/candles", response_model=list[Candle])
+@router.get("/candles", response_model=CandleQueryResult)
 async def get_market_candles(
     symbol: str = Query(min_length=1, max_length=40),
     timeframe: str = Query(min_length=1, max_length=16),
     start: datetime = Query(),
     end: datetime = Query(),
     service: CandleStorageService = Depends(get_candle_storage_service),
-) -> list[Candle]:
+) -> CandleQueryResult:
     try:
         timeframe = normalize_timeframe(timeframe)
-        return await service.get_candles(symbol, timeframe, start, end)
+        return await service.get_candles_with_metadata(symbol, timeframe, start, end)
     except SymbolNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except (BinanceValidationError, OandaValidationError, TimeframeValidationError, ValueError) as exc:

@@ -1712,3 +1712,37 @@ Implement Day 28.
 ### Safety notes
 
 - This only corrects read-only chart rendering; provider storage and trading behavior are unchanged.
+
+## 2026-06-30 - Day 30.19 aggregation cache verification
+
+### Work completed
+
+- Added typed candle response metadata for provider, market type, aggregation, base timeframe, cache hit, and fetched ranges.
+- Preserved a list-only service method for internal compatibility while the HTTP API returns a metadata envelope.
+- Added exact aggregate target-cache verification and repeated-request coverage.
+- Added direct/aggregated source labels to each chart window with cache diagnostics in the tooltip.
+
+### Verification performed
+
+- Repeated aggregate requests prove the second request makes no provider call, commit, or upsert.
+- 94 market-data tests passed.
+- 56 frontend tests, lint, and typecheck passed.
+- Live XAUUSD `7m` verification returned miss/fetched `1` on the first uncached request, hit/fetched `0` on the second, and identical 30-candle payloads.
+
+### Safety notes
+
+- Metadata and cache behavior are read-only; no exchange write or trading path changed.
+
+## 2026-06-30 - Custom timeframe ordering polish
+
+### Work completed
+
+- Added deterministic duration-based sorting for preset and custom timeframes.
+- Favorite buttons now reorder automatically after add/remove operations.
+- Favorited custom timeframes are included in every chart-window timeframe selector.
+- Options are deduplicated while the active non-favorite custom timeframe remains selectable.
+
+### Verification performed
+
+- Added coverage proving `5m`, `6m`, `15m`, `1h`, `2w`, `1M` ordering.
+- 57 frontend tests, lint, typecheck, and production build passed.

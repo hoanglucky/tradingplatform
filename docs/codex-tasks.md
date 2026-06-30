@@ -14,6 +14,24 @@ Use this file to track task-level handoff notes for Codex sessions.
 
 ## Completed
 
+### 2026-06-30 - Custom timeframe ordering polish
+
+- Sorted favorites and chart-window options by duration.
+- Added favorited custom timeframes to every chart selector.
+- Verified with 57 frontend tests and production build.
+
+### 2026-06-30 - Day 30.19 aggregation cache verification
+
+Implemented:
+
+- Added source, aggregation, base-timeframe, cache, and fetch-count metadata.
+- Verified repeated aggregate requests use exact target cache without provider work.
+- Exposed direct/aggregated source labels in chart windows.
+
+Verified:
+
+- 94 market-data and 56 frontend tests pass.
+
 ### 2026-06-30 - Day 30.9.6 realtime candle open continuity repair
 
 Implemented:

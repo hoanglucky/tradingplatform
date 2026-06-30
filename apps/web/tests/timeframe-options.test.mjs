@@ -4,6 +4,7 @@ import {
   DEFAULT_TIMEFRAME_FAVORITES,
   normalizeChartTimeframe,
   parseStoredTimeframeFavorites,
+  sortChartTimeframes,
   supportsRealtimeTimeframe,
 } from "../lib/timeframe-options.ts";
 
@@ -19,6 +20,17 @@ test("normalizes custom minute, hour, week, and month timeframes", () => {
 test("loads unique valid timeframe favorites", () => {
   assert.deepEqual(parseStoredTimeframeFavorites('["3m","3m","45m","bad"]'), ["3m", "45m"]);
   assert.deepEqual(parseStoredTimeframeFavorites("bad json"), DEFAULT_TIMEFRAME_FAVORITES);
+});
+
+test("sorts preset and custom favorites by timeframe duration", () => {
+  assert.deepEqual(sortChartTimeframes(["1h", "15m", "6m", "5m", "1M", "2w"]), [
+    "5m",
+    "6m",
+    "15m",
+    "1h",
+    "2w",
+    "1M",
+  ]);
 });
 
 test("uses polling only when a provider has no direct realtime timeframe", () => {

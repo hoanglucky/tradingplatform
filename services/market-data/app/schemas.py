@@ -43,6 +43,20 @@ class AggregatedCandle(Candle):
         return self
 
 
+class CandleQueryMetadata(BaseModel):
+    source_provider: str
+    source_market_type: str
+    aggregation_used: bool
+    base_timeframe: str | None = None
+    cache_hit: bool
+    missing_ranges_fetched: int = Field(ge=0)
+
+
+class CandleQueryResult(BaseModel):
+    candles: list[Candle]
+    metadata: CandleQueryMetadata
+
+
 class LatestPrice(BaseModel):
     symbol: str = Field(min_length=1, max_length=40)
     timestamp: datetime

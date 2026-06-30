@@ -29,16 +29,16 @@
 
 ## Current review task
 
-Review realtime candle open continuity.
+Review aggregation cache metadata.
 
 Focus areas:
 
-- Observe at least two 1m transitions without reloading.
-- Confirm each new contiguous candle opens at the previous candle close.
-- Repeat on 5m and another visible higher timeframe.
-- Confirm previous candles do not change because another timeframe updates.
-- Confirm no realtime candle disappears before REST backfill.
-- Confirm a genuine market-session gap is not forcibly closed.
+- Request the same aggregate symbol/timeframe/range twice.
+- Confirm the first response reports a cache miss and fetched range count.
+- Confirm the second response reports `cache_hit=true` and zero fetched ranges.
+- Confirm direct chart windows show their provider and `Direct`.
+- Confirm custom aggregate windows show `Aggregated from {base timeframe}`.
+- Confirm candle data remains identical between miss and hit responses.
 - Confirm no live trading or exchange write behavior was added.
 
 ## Verification commands

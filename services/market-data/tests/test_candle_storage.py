@@ -200,3 +200,27 @@ async def test_aggregates_unsupported_oanda_timeframe_from_direct_base() -> None
     assert [candle.timeframe for candle in result] == ["3m", "3m"]
     assert [candle.timestamp for candle in result] == [start, start + timedelta(minutes=3)]
     assert repository.commits == 2
+
+
+@pytest.mark.anyio
+async def test_repeated_aggregate_request_uses_exact_target_cache() -> None:
+    start = datetime(2024, 6, 19, 8, 0, tzinfo=UTC)
+    end = start + timedelta(minutes=6)
+    source = [make_candle(start + timedelta(minutes=index)) for index in range(6)]
+    repository = FakeRepository()
+    provider = FakeProvider(source, exchange="oanda")
+    service = CandleStorageService(repository, provider)
+
+    first = await service.get_candles_with_metadata("XAUUSD", "3m", start, end)
+    commits_after_first = repository.commits
+    second = await service.get_candles_with_metadata("XAUUSD", "3m", start, end)
+
+    assert first.metadata.cache_hit is False
+    assert first.metadata.aggregation_used is True
+    assert first.metadata.base_timeframe == "1m"
+    assert first.metadata.missing_ranges_fetched == 1
+    assert second.metadata.cache_hit is True
+    assert second.metadata.missing_ranges_fetched == 0
+    assert second.candles == first.candles
+    assert provider.calls == 1
+    assert repository.commits == commits_after_first

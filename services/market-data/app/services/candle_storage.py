@@ -6,8 +6,8 @@ from typing import Protocol
 
 from app.providers import MarketDataProvider
 from app.candle_aggregator import aggregate_candles
-from app.provider_capabilities import provider_supports_direct_timeframe
-from app.schemas import Candle
+from app.provider_capabilities import get_provider_capability, provider_supports_direct_timeframe
+from app.schemas import Candle, CandleQueryMetadata, CandleQueryResult
 from app.storage.candles import SymbolNotFoundError
 from app.timeframes import parse_timeframe
 
@@ -66,9 +66,21 @@ class CandleStorageService:
         start: datetime,
         end: datetime,
     ) -> list[Candle]:
+        return (await self.get_candles_with_metadata(symbol, timeframe, start, end)).candles
+
+    async def get_candles_with_metadata(
+        self,
+        symbol: str,
+        timeframe: str,
+        start: datetime,
+        end: datetime,
+    ) -> CandleQueryResult:
         exchange = getattr(self.provider, "exchange", None)
+        capability = get_provider_capability(str(exchange))
         target = parse_timeframe(timeframe)
         timeframe = target.value
+        direct = provider_supports_direct_timeframe(str(exchange), timeframe)
+        base_timeframe = None if direct else self._aggregation_base_timeframe(str(exchange), timeframe)
         symbol_id = await self.repository.get_symbol_id(symbol, exchange)
         if symbol_id is None:
             raise SymbolNotFoundError(f"Symbol {symbol.upper()} is not registered.")
@@ -77,17 +89,31 @@ class CandleStorageService:
             symbol_id, symbol, timeframe, start, end
         )
         if self._cache_covers_range(cached, timeframe, start, end, exchange):
-            return cached
+            return CandleQueryResult(
+                candles=cached,
+                metadata=CandleQueryMetadata(
+                    source_provider=capability.provider,
+                    source_market_type=capability.market_type,
+                    aggregation_used=not direct,
+                    base_timeframe=base_timeframe,
+                    cache_hit=True,
+                    missing_ranges_fetched=0,
+                ),
+            )
 
-        if provider_supports_direct_timeframe(str(exchange), timeframe):
+        missing_ranges_fetched = 0
+        if direct:
             fetched = await self.provider.get_historical_candles(
                 symbol, timeframe, start, end
             )
+            missing_ranges_fetched = 1
         else:
-            base_timeframe = self._aggregation_base_timeframe(str(exchange), timeframe)
-            base_candles = await self.get_candles(
+            assert base_timeframe is not None
+            base_result = await self.get_candles_with_metadata(
                 symbol, base_timeframe, start, end
             )
+            base_candles = base_result.candles
+            missing_ranges_fetched = base_result.metadata.missing_ranges_fetched
             fetched = [
                 Candle.model_validate(candle.model_dump(exclude={"closed", "partial"}))
                 for candle in aggregate_candles(base_candles, timeframe)
@@ -97,8 +123,19 @@ class CandleStorageService:
         await self.repository.upsert_many(symbol_id, unique)
         await self.repository.commit()
 
-        return await self.repository.list_range(
+        result = await self.repository.list_range(
             symbol_id, symbol, timeframe, start, end
+        )
+        return CandleQueryResult(
+            candles=result,
+            metadata=CandleQueryMetadata(
+                source_provider=capability.provider,
+                source_market_type=capability.market_type,
+                aggregation_used=not direct,
+                base_timeframe=base_timeframe,
+                cache_hit=False,
+                missing_ranges_fetched=missing_ranges_fetched,
+            ),
         )
 
     @staticmethod

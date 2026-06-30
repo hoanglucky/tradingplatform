@@ -44,6 +44,20 @@ export type CandleRequest = {
   end: Date;
 };
 
+export type CandleQueryMetadata = {
+  source_provider: string;
+  source_market_type: string;
+  aggregation_used: boolean;
+  base_timeframe: string | null;
+  cache_hit: boolean;
+  missing_ranges_fetched: number;
+};
+
+export type CandleQueryResult = {
+  candles: Candle[];
+  metadata: CandleQueryMetadata | null;
+};
+
 export function normalizeCandles(payload: unknown): Candle[] {
   if (!Array.isArray(payload)) {
     throw new Error("Market data response is not a candle list.");
@@ -119,6 +133,14 @@ export async function fetchMarketCandles(
   request: CandleRequest,
   signal?: AbortSignal,
 ): Promise<Candle[]> {
+  return (await fetchMarketCandleResult(marketDataBaseUrl, request, signal)).candles;
+}
+
+export async function fetchMarketCandleResult(
+  marketDataBaseUrl: string,
+  request: CandleRequest,
+  signal?: AbortSignal,
+): Promise<CandleQueryResult> {
   const params = new URLSearchParams({
     symbol: request.symbol,
     timeframe: request.timeframe,
@@ -129,5 +151,28 @@ export async function fetchMarketCandles(
   if (!response.ok) {
     throw new Error(await marketDataError(response));
   }
-  return normalizeCandles(await response.json());
+  const payload = await response.json();
+  if (Array.isArray(payload)) {
+    return { candles: normalizeCandles(payload), metadata: null };
+  }
+  if (!payload || typeof payload !== "object" || !Array.isArray(payload.candles)) {
+    throw new Error("Market data response is not a candle result.");
+  }
+  const metadata = payload.metadata as Partial<CandleQueryMetadata> | undefined;
+  if (
+    !metadata ||
+    typeof metadata.source_provider !== "string" ||
+    typeof metadata.source_market_type !== "string" ||
+    typeof metadata.aggregation_used !== "boolean" ||
+    !(typeof metadata.base_timeframe === "string" || metadata.base_timeframe === null) ||
+    typeof metadata.cache_hit !== "boolean" ||
+    !Number.isInteger(metadata.missing_ranges_fetched) ||
+    Number(metadata.missing_ranges_fetched) < 0
+  ) {
+    throw new Error("Market data response contains invalid metadata.");
+  }
+  return {
+    candles: normalizeCandles(payload.candles),
+    metadata: metadata as CandleQueryMetadata,
+  };
 }

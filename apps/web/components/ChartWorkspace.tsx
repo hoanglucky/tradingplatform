@@ -26,7 +26,7 @@ import {
 import { MultiTimeframeGrid } from "./MultiTimeframeGrid";
 import { TimeframeSelector } from "./TimeframeSelector";
 import { useStoredString } from "../lib/collapsible-layout";
-import { parseStoredTimeframeFavorites } from "../lib/timeframe-options";
+import { parseStoredTimeframeFavorites, sortChartTimeframes } from "../lib/timeframe-options";
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 const CHART_TIMEZONES = ["UTC", "Asia/Bangkok"] as const;
@@ -192,7 +192,7 @@ export function ChartWorkspace({ initialSymbol }: { initialSymbol?: string }) {
   function toggleTimeframeFavorite(timeframe: string) {
     const next = timeframeFavorites.includes(timeframe)
       ? timeframeFavorites.filter((item) => item !== timeframe)
-      : [...timeframeFavorites, timeframe];
+      : sortChartTimeframes([...timeframeFavorites, timeframe]);
     setStoredFavorites(JSON.stringify(next));
   }
 
@@ -271,6 +271,10 @@ export function ChartWorkspace({ initialSymbol }: { initialSymbol?: string }) {
 
       <MultiTimeframeGrid
         layout={multiTimeframeLayout}
+        timeframeOptions={sortChartTimeframes([
+          ...MULTI_TIMEFRAME_TIMEFRAMES,
+          ...timeframeFavorites,
+        ])}
         timezone={timezone}
         refreshVersion={refreshVersion}
         activeWindowId={activeWindow?.id ?? "w1"}

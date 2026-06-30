@@ -990,6 +990,15 @@ h2 {
   padding-left: 3px;
 }
 
+.window-source-label {
+  overflow: hidden;
+  max-width: 160px;
+  color: var(--muted);
+  font-size: 0.68rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .multi-timeframe-window-header span,
 .review-window-timeframe > span {
   color: var(--muted);

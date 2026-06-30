@@ -1865,14 +1865,14 @@ Done checklist:
 
 [x] Custom timeframe accepted
 [x] Invalid timeframe rejected cleanly
-[ ] Response metadata exists
+[x] Response metadata exists
 [x] Tests pass
 
 Implementation note — 2026-06-30:
 
 - `/market/candles` accepts normalized minute, hour, day, week, and `1M` values.
 - Invalid, zero, malformed, or over-one-month values return HTTP 400.
-- Response shape remains the existing candle list for frontend compatibility; metadata is still pending.
+- The response uses `{ candles, metadata }` and exposes provider, market type, aggregation, base timeframe, cache hit, and fetched-range count.
 Day 30.16 — Frontend custom timeframe option
 Goal: User can add custom timeframe to a chart window.
 
@@ -1941,7 +1941,7 @@ Requirements:
 Done checklist:
 
 [x] Custom timeframe chart loads
-[ ] Aggregation label visible when used
+[x] Aggregation label visible when used
 [x] Per-window errors work
 
 Implementation note — 2026-06-30:
@@ -1949,6 +1949,7 @@ Implementation note — 2026-06-30:
 - Custom windows send their normalized timeframe to `/market/candles`.
 - Provider-native intervals retain WebSocket updates; aggregate-only intervals use visible-tab REST auto-sync every 10 seconds.
 - Each window keeps independent loading/error state.
+- Window headers now show direct provider or `Aggregated from {base timeframe}` metadata.
 Day 30.19 — Aggregation cache verification
 Goal: Prevent repeated expensive aggregation.
 
@@ -1966,9 +1967,18 @@ Requirements:
 - Add tests for repeated requests.
 Done checklist:
 
-[ ] Aggregated candles cached
-[ ] Repeated request uses cache
-[ ] Tests pass
+[x] Aggregated candles cached
+[x] Repeated request uses cache
+[x] Tests pass
+
+Implementation note — 2026-06-30:
+
+- Added a typed candle query envelope with source and cache metadata.
+- Exact target-cache coverage returns `cache_hit=true` and performs no provider fetch or upsert.
+- Aggregate misses report the compatible base timeframe and propagate provider-range fetch counts.
+- Repeated-request tests prove the second request performs no provider call, commit, or re-aggregation.
+- Frontend window headers expose source/aggregation labels and cache diagnostics through a tooltip.
+- Verification: 94 market-data tests and 56 frontend tests pass.
 Day 30.20 — Edge case tests for custom timeframe
 Goal: Harden custom timeframe logic.
 
@@ -2006,9 +2016,15 @@ Add:
 - Small warning if data is partial or missing.
 Done checklist:
 
-[ ] Source label visible
-[ ] Aggregated label visible
+[x] Source label visible
+[x] Aggregated label visible
 [ ] Partial/missing warning visible
+
+Implementation note — 2026-06-30:
+
+- Favorite timeframe buttons are sorted by normalized duration rather than insertion order.
+- Preset and favorited custom values are merged, deduplicated, and sorted in every chart-window selector.
+- A custom `6m` favorite therefore appears after `5m` and before `15m` in both toolbar and window dropdowns.
 Day 30.22 — Custom timeframe documentation
 Goal: Document how custom timeframe works.
 

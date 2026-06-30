@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { fetchMarketCandles, recentCandleRequest, timeframeSeconds } from "../lib/market-candles.ts";
+import {
+  fetchMarketCandleResult,
+  fetchMarketCandles,
+  recentCandleRequest,
+  timeframeSeconds,
+} from "../lib/market-candles.ts";
 
 test("builds an aligned recent candle range for extended timeframes", () => {
   const now = Date.UTC(2026, 5, 30, 10, 45);
@@ -61,6 +66,49 @@ test("fetches and normalizes candles through the shared client", async (context)
   assert.equal(candles.length, 1);
   assert.equal(candles[0].close, 6108.5);
   assert.equal(candles[0].volume, 42);
+});
+
+test("returns candle source and aggregation metadata", async (context) => {
+  const originalFetch = globalThis.fetch;
+  context.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+  globalThis.fetch = async () =>
+    new Response(
+      JSON.stringify({
+        candles: [
+          {
+            symbol: "XAUUSD",
+            timeframe: "45m",
+            timestamp: "2026-06-30T10:00:00Z",
+            open: "3300",
+            high: "3310",
+            low: "3290",
+            close: "3305",
+            volume: "10",
+          },
+        ],
+        metadata: {
+          source_provider: "oanda",
+          source_market_type: "cfd_fx",
+          aggregation_used: true,
+          base_timeframe: "15m",
+          cache_hit: true,
+          missing_ranges_fetched: 0,
+        },
+      }),
+      { headers: { "Content-Type": "application/json" } },
+    );
+
+  const result = await fetchMarketCandleResult(
+    "http://market.test",
+    recentCandleRequest("XAUUSD", "45m", Date.UTC(2026, 5, 30, 10, 45)),
+  );
+
+  assert.equal(result.candles.length, 1);
+  assert.equal(result.metadata?.aggregation_used, true);
+  assert.equal(result.metadata?.base_timeframe, "15m");
+  assert.equal(result.metadata?.cache_hit, true);
 });
 
 test("surfaces a provider error without returning partial data", async (context) => {

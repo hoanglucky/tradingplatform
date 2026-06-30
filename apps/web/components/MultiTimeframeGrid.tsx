@@ -3,13 +3,16 @@
 import type { Candle, MultiTimeframeWindow } from "@trading-framework/shared";
 import { useEffect, useRef, useState } from "react";
 import {
-  MULTI_TIMEFRAME_TIMEFRAMES,
   type MultiTimeframeLayout,
   type MultiTimeframeTimeframe,
   uniqueVisibleMultiTimeframeTimeframes,
   visibleMultiTimeframeWindows,
 } from "../lib/multi-timeframe";
-import { fetchMarketCandles, recentCandleRequest } from "../lib/market-candles";
+import {
+  fetchMarketCandleResult,
+  recentCandleRequest,
+  type CandleQueryMetadata,
+} from "../lib/market-candles";
 import {
   createHeartbeatPong,
   getReconnectDelay,
@@ -35,6 +38,7 @@ type RealtimeStatus = "connecting" | "connected" | "reconnecting" | "source-reco
 
 type MultiTimeframeGridProps = {
   layout: MultiTimeframeLayout;
+  timeframeOptions: string[];
   timezone: string;
   refreshVersion: number;
   activeWindowId: string;
@@ -47,6 +51,7 @@ type MultiTimeframeChartWindowProps = {
   symbol: string;
   timezone: string;
   reviewWindow: MultiTimeframeWindow;
+  timeframeOptions: string[];
   refreshVersion: number;
   resumeVersion: number;
   realtimeCandles?: Candle[];
@@ -70,6 +75,7 @@ function MultiTimeframeChartWindow({
   symbol,
   timezone,
   reviewWindow,
+  timeframeOptions,
   refreshVersion,
   resumeVersion,
   realtimeCandles,
@@ -83,6 +89,7 @@ function MultiTimeframeChartWindow({
   const [historicalCandles, setHistoricalCandles] = useState<Candle[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [metadata, setMetadata] = useState<CandleQueryMetadata | null>(null);
   const realtimeCandlesRef = useRef(realtimeCandles);
   const requestIdentityRef = useRef(`${symbol}:${reviewWindow.timeframe}`);
 
@@ -107,11 +114,13 @@ function MultiTimeframeChartWindow({
       setError(null);
       if (identityChanged) setHistoricalCandles([]);
       try {
-        const historical = await fetchMarketCandles(
+        const result = await fetchMarketCandleResult(
           marketDataBaseUrl,
           recentCandleRequest(symbol, reviewWindow.timeframe),
           controller.signal,
         );
+        const historical = result.candles;
+        setMetadata(result.metadata);
         const currentRealtime = realtimeCandlesRef.current ?? [];
         setHistoricalCandles(
           currentRealtime.reduce(
@@ -148,6 +157,16 @@ function MultiTimeframeChartWindow({
           <span className={`window-stream-status${realtimeStatus === "connected" ? " is-live" : ""}`}>
             {realtimeStatusLabel(realtimeStatus)}
           </span>
+          {metadata ? (
+            <span
+              className="window-source-label"
+              title={`Provider: ${metadata.source_provider}; market: ${metadata.source_market_type}; cache: ${metadata.cache_hit ? "hit" : "miss"}; fetched ranges: ${metadata.missing_ranges_fetched}`}
+            >
+              {metadata.aggregation_used
+                ? `Aggregated from ${metadata.base_timeframe}`
+                : `${metadata.source_provider} · Direct`}
+            </span>
+          ) : null}
         </div>
         <label className="review-window-check">
           <input
@@ -166,12 +185,10 @@ function MultiTimeframeChartWindow({
             onTimeframeChange(reviewWindow.id, event.target.value as MultiTimeframeTimeframe)
           }
         >
-          {!MULTI_TIMEFRAME_TIMEFRAMES.includes(
-            reviewWindow.timeframe as (typeof MULTI_TIMEFRAME_TIMEFRAMES)[number],
-          ) ? (
+          {!timeframeOptions.includes(reviewWindow.timeframe) ? (
             <option value={reviewWindow.timeframe}>{reviewWindow.timeframe}</option>
           ) : null}
-          {MULTI_TIMEFRAME_TIMEFRAMES.map((timeframe) => (
+          {timeframeOptions.map((timeframe) => (
             <option value={timeframe} key={timeframe}>
               {timeframe}
             </option>
@@ -193,6 +210,7 @@ function MultiTimeframeChartWindow({
 
 export function MultiTimeframeGrid({
   layout,
+  timeframeOptions,
   timezone,
   refreshVersion,
   activeWindowId,
@@ -347,6 +365,7 @@ export function MultiTimeframeGrid({
           symbol={layout.symbol}
           timezone={timezone}
           reviewWindow={reviewWindow}
+          timeframeOptions={timeframeOptions}
           refreshVersion={refreshVersion}
           resumeVersion={resumeVersion + pollVersion}
           realtimeCandles={realtimeCandles[`${layout.symbol}:${reviewWindow.timeframe}`]}
