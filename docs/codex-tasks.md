@@ -14,6 +14,20 @@ Use this file to track task-level handoff notes for Codex sessions.
 
 ## Completed
 
+### 2026-06-30 - TLP structure overlay FE test
+
+- Integrated the user-provided TLP Python analyzer without replacing its state machine.
+- Added `POST /structure/analyze` with normalized candle/config validation and browser CORS.
+- Added an optional per-window Structure control with swing lines and H/L chart markers.
+- Verified 119 live XAUUSD 5m candles produce 44 swings and 43 segments.
+
+### 2026-06-30 - Day 30.30 structure engine base
+
+- Created the Dockerized `services/structure-engine` service on port 8108.
+- Added immutable candle, swing, state, direction, and configuration types with strict validation.
+- Added Compose and Makefile integration plus 8 passing model tests.
+- Kept the service analysis-only with no trading signals or exchange writes.
+
 ### 2026-06-30 - Unified Oanda realtime clock
 
 - Removed independent M1/M5 polling phase drift by deriving every Oanda chart timeframe from one shared M1 stream.

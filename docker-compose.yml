@@ -124,6 +124,16 @@ services:
       redis:
         condition: service_healthy
 
+  structure-engine:
+    profiles:
+      - services
+    build:
+      context: ./services/structure-engine
+    env_file:
+      - .env
+    ports:
+      - "8108:8108"
+
   backtest-engine:
     profiles:
       - services

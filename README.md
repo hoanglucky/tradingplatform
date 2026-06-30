@@ -19,6 +19,7 @@ packages/ui               Shared UI primitives
 services/market-data      Market ingestion and normalization service
 services/indicator-engine Indicator calculation service
 services/strategy-engine  Strategy signal service
+services/structure-engine Pure market structure analysis service
 services/backtest-engine  Historical simulation service
 services/paper-trading    Simulated execution and portfolio service
 services/alert-engine     Notification routing service

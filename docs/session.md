@@ -1880,3 +1880,47 @@ Implement Day 28.
 ### Safety notes
 
 - This is read-only display synchronization and does not change exchange permissions.
+
+## 2026-06-30 - Day 30.30 structure engine base
+
+### Work completed
+
+- Created `services/structure-engine` with Docker, Compose, health, and capabilities support.
+- Defined immutable `Candle`, `SwingPoint`, `SwingDirection`, `MarketStructureState`, and `StructureConfig` types.
+- Added validation for timezone-aware timestamps, OHLC consistency, volume, swing references, and detector configuration.
+- Added `make structure-test` and documented the service in the root README and architecture ownership table.
+
+### Verification performed
+
+- All 8 structure model tests pass inside the service image.
+- Started the service on port 8108 and verified both `/health` and `/capabilities`.
+
+### Safety notes
+
+- The foundation performs no signal generation, order placement, or exchange writes.
+
+## 2026-06-30 - TLP structure overlay FE test
+
+### Work completed
+
+- Preserved and integrated the user-provided `structure_engine.py` TLP state machine.
+- Fixed its test import path and exposed `POST /structure/analyze` with candle/config validation.
+- Added CORS for the local web app and compatibility with market-data quality fields.
+- Added a per-window Structure toggle that renders a blue swing line and high/low markers.
+- Kept consolidation boxes and NoS/NoD marker data in the API response for later UI work.
+
+### Verification performed
+
+- All 13 structure tests pass, including the four user-provided algorithm tests and the API contract regression.
+- Frontend lint, typecheck, 60 tests, and production build pass.
+- A live 119-candle XAUUSD 5m request returned 44 swings, 43 segments, 12 boxes, and 83 markers.
+- Web and structure-engine containers were deployed and are reachable on ports 2000 and 8108.
+
+### Safety notes
+
+- The overlay is analysis-only and cannot emit orders or write to an exchange.
+
+## 2026-06-30 - Swing overlay visual cleanup
+
+- Changed the structure line to a thin blue 1px stroke.
+- Removed swing marker rendering and the `H`/`L` labels while retaining swing points in the API data.

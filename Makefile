@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: help setup dev up compose compose-services down logs ps web api api-test market-data-test web-test test db-upgrade db-downgrade db-current db-revision seed lint format clean
+.PHONY: help setup dev up compose compose-services down logs ps web api api-test market-data-test structure-test web-test test db-upgrade db-downgrade db-current db-revision seed lint format clean
 
 help:
 	@printf "Available commands:\n"
@@ -16,6 +16,7 @@ help:
 	@printf "  make api     Run the FastAPI app locally\n"
 	@printf "  make api-test Run backend tests in Docker\n"
 	@printf "  make market-data-test Run market-data service tests in Docker\n"
+	@printf "  make structure-test Run structure-engine tests in Docker\n"
 	@printf "  make web-test Run frontend checks\n"
 	@printf "  make test    Run API and web checks\n"
 	@printf "  make db-upgrade Apply Alembic migrations\n"
@@ -71,6 +72,10 @@ market-data-test:
 	docker compose --profile services build api market-data
 	docker compose run --rm api alembic upgrade head
 	docker compose --profile services run --rm market-data sh -c "APP_ENV=test pytest"
+
+structure-test:
+	docker compose --profile services build structure-engine
+	docker compose --profile services run --rm structure-engine pytest
 
 test: api-test market-data-test web-test
 

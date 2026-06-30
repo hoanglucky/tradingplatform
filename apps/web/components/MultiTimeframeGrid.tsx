@@ -1,7 +1,7 @@
 "use client";
 
 import type { Candle, MultiTimeframeWindow } from "@trading-framework/shared";
-import { AlertTriangle } from "lucide-react";
+import { Activity, AlertTriangle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import {
   type MultiTimeframeLayout,
@@ -24,6 +24,7 @@ import {
 } from "../lib/market-stream";
 import { CandlestickChart } from "./CandlestickChart";
 import { realtimeSourceTimeframe } from "../lib/timeframe-options";
+import { fetchStructureOverlay, type StructureOverlay } from "../lib/structure-overlay";
 
 const marketDataBaseUrl = process.env.NEXT_PUBLIC_MARKET_DATA_BASE_URL ?? "http://localhost:8101";
 const marketWebSocketUrl = process.env.NEXT_PUBLIC_MARKET_WS_URL ?? "ws://localhost:8000/ws/market";
@@ -94,6 +95,9 @@ function MultiTimeframeChartWindow({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [metadata, setMetadata] = useState<CandleQueryMetadata | null>(null);
+  const [structureEnabled, setStructureEnabled] = useState(false);
+  const [structureOverlay, setStructureOverlay] = useState<StructureOverlay | null>(null);
+  const [structureError, setStructureError] = useState<string | null>(null);
   const realtimeCandlesRef = useRef(realtimeCandles);
   const requestIdentityRef = useRef(`${symbol}:${reviewWindow.timeframe}`);
 
@@ -108,6 +112,29 @@ function MultiTimeframeChartWindow({
   );
   const visibleError = realtimeCandles?.length ? null : error;
   const includeActiveCandle = realtimeSourceTimeframe !== reviewWindow.timeframe;
+
+  useEffect(() => {
+    if (!structureEnabled || candles.length === 0) return;
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      void fetchStructureOverlay(symbol, reviewWindow.timeframe, candles, controller.signal)
+        .then((overlay) => {
+          setStructureOverlay(overlay);
+          setStructureError(null);
+        })
+        .catch((requestError: unknown) => {
+          if (!controller.signal.aborted) {
+            setStructureError(
+              requestError instanceof Error ? requestError.message : "Structure analysis failed.",
+            );
+          }
+        });
+    }, 300);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [candles, reviewWindow.timeframe, structureEnabled, symbol]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -198,14 +225,34 @@ function MultiTimeframeChartWindow({
             </span>
           ) : null}
         </div>
-        <label className="review-window-check">
+        <div className="review-window-actions">
+          <button
+            type="button"
+            className={`structure-toggle${structureEnabled ? " is-active" : ""}`}
+            onClick={() => {
+              setStructureEnabled((enabled) => {
+                if (enabled) {
+                  setStructureOverlay(null);
+                  setStructureError(null);
+                }
+                return !enabled;
+              });
+            }}
+            title={structureEnabled ? "Hide TLP swing structure" : "Show TLP swing structure"}
+            aria-pressed={structureEnabled}
+          >
+            <Activity size={15} aria-hidden="true" />
+            <span>{structureError ? "Structure error" : `Structure${structureOverlay ? ` ${structureOverlay.swings.length}` : ""}`}</span>
+          </button>
+          <label className="review-window-check">
           <input
             type="checkbox"
             checked={reviewWindow.reviewChecked}
             onChange={(event) => onReviewChange(reviewWindow.id, event.target.checked)}
           />
           <span>Reviewed</span>
-        </label>
+          </label>
+        </div>
       </header>
       <label className="review-window-timeframe">
         <span>Timeframe</span>
@@ -233,6 +280,7 @@ function MultiTimeframeChartWindow({
         height={chartHeight}
         loading={loading && candles.length === 0}
         error={visibleError}
+        structureOverlay={structureOverlay}
       />
     </article>
   );

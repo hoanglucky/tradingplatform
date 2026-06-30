@@ -56,10 +56,13 @@ MVP user mode is not an authentication system: there are no credentials, session
 | `services/market-data` | Selects read-only providers, normalizes candles, exposes `/market/candles`, and caches results in PostgreSQL. |
 | `services/indicator-engine` | Computes indicators from normalized market data. |
 | `services/strategy-engine` | Evaluates strategies and emits signals for paper trading or backtesting. |
+| `services/structure-engine` | Performs pure, read-only price-structure analysis without generating trading signals. |
 | `services/backtest-engine` | Replays historical data and calculates performance metrics. |
 | `services/paper-trading` | Simulates order placement, fills, positions, balances, and PnL. |
 | `services/alert-engine` | Routes notifications for signals, failures, and risk events. |
 | `services/exchange-adapters` | Provides read-only exchange connectivity until write support is explicitly designed later. |
+
+The structure engine accepts normalized candles through `POST /structure/analyze` and returns TLP swings, line segments, consolidation boxes, and markers. The chart renders swing lines and high/low markers as an optional per-window overlay; it does not execute PineScript in the browser.
 
 ## Data Flow
 

@@ -2089,9 +2089,17 @@ Rules:
 - Keep code pure and testable.
 Done checklist:
 
-[ ] services/structure-engine exists
-[ ] Structure types exist
-[ ] Tests for type validation exist
+[x] services/structure-engine exists
+[x] Structure types exist
+[x] Tests for type validation exist
+
+Implementation note — 2026-06-30:
+
+- Added a standalone `structure-engine` service on port 8108 with Docker Compose and Makefile test support.
+- Added immutable `Candle`, `SwingPoint`, `SwingDirection`, `MarketStructureState`, and `StructureConfig` models.
+- Validation covers timezone-aware timestamps, consistent positive OHLC, optional non-negative volume, valid swing identity/indexes, and bounded configuration.
+- The service exposes only structure-analysis capabilities and contains no BUY/SELL or order behavior.
+- Verification: 8 model tests pass in Docker; live health and capabilities endpoints return successfully.
 Day 30.31 — Swing high / swing low detector
 Goal: Detect swing highs and swing lows from candles.
 

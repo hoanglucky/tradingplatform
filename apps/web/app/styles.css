@@ -1033,6 +1033,45 @@ h2 {
   white-space: nowrap;
 }
 
+.review-window-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.structure-toggle {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0 7px;
+}
+
+.structure-toggle:hover,
+.structure-toggle.is-active {
+  border-color: var(--accent);
+  background: #e8f5f3;
+  color: var(--accent-strong);
+}
+
+.structure-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.multi-timeframe-grid.is-layout-8 .window-source-label,
+.multi-timeframe-grid.is-layout-8 .structure-toggle span {
+  display: none;
+}
+
 .review-window-check input {
   width: 15px;
   height: 15px;

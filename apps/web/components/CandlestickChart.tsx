@@ -6,6 +6,7 @@ import {
   CandlestickSeries,
   ColorType,
   createChart,
+  LineSeries,
   type CandlestickData,
   type IChartApi,
   type ISeriesApi,
@@ -13,6 +14,7 @@ import {
   type Time,
   type UTCTimestamp,
 } from "lightweight-charts";
+import type { StructureOverlay } from "../lib/structure-overlay";
 import { resetCandlestickChartView } from "../lib/chart-view";
 import {
   candleOpenTimestampSeconds,
@@ -28,6 +30,7 @@ export type CandlestickChartProps = {
   height: number;
   loading: boolean;
   error: string | null;
+  structureOverlay?: StructureOverlay | null;
 };
 
 function toChartData(candles: Candle[]): CandlestickData<UTCTimestamp>[] {
@@ -51,10 +54,12 @@ export function CandlestickChart({
   height,
   loading,
   error,
+  structureOverlay,
 }: CandlestickChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const structureSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
   const fitContentRef = useRef(false);
   const previousDataRef = useRef<CandlestickData<UTCTimestamp>[]>([]);
   const [inspectedTime, setInspectedTime] = useState<string | null>(null);
@@ -104,8 +109,16 @@ export function CandlestickChart({
       wickUpColor: "#0d9488",
       wickDownColor: "#dc4c3f",
     });
+    const structureSeries = chart.addSeries(LineSeries, {
+      color: "#1677a6",
+      lineWidth: 1,
+      priceLineVisible: false,
+      lastValueVisible: false,
+      crosshairMarkerVisible: true,
+    });
     chartRef.current = chart;
     seriesRef.current = series;
+    structureSeriesRef.current = structureSeries;
     fitContentRef.current = true;
 
     const handleCrosshairMove = (event: MouseEventParams<Time>) => {
@@ -123,6 +136,7 @@ export function CandlestickChart({
     return () => {
       chartRef.current = null;
       seriesRef.current = null;
+      structureSeriesRef.current = null;
       fitContentRef.current = false;
       previousDataRef.current = [];
       chart.unsubscribeCrosshairMove(handleCrosshairMove);
@@ -158,6 +172,18 @@ export function CandlestickChart({
       }
     }
   }, [candles, error, loading, timeframe]);
+
+  useEffect(() => {
+    const lineSeries = structureSeriesRef.current;
+    if (!lineSeries) return;
+    const swings = structureOverlay?.swings ?? [];
+    const uniqueLinePoints = new Map<number, { time: UTCTimestamp; value: number }>();
+    for (const swing of swings) {
+      const time = candleOpenTimestampSeconds(swing.timestamp) as UTCTimestamp;
+      if (Number.isFinite(time)) uniqueLinePoints.set(time, { time, value: swing.price });
+    }
+    lineSeries.setData([...uniqueLinePoints.values()].sort((left, right) => left.time - right.time));
+  }, [structureOverlay]);
 
   if (loading) {
     return (
